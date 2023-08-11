@@ -39,166 +39,209 @@ import org.opensearch.common.settings.Settings;
 import org.opensearch.test.OpenSearchTestCase;
 
 import java.util.Arrays;
-import java.util.Collections;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 import static java.util.Collections.singletonList;
 
-public class FieldAliasMapperValidationTests extends OpenSearchTestCase {
+public class FieldCorrelationsMapperValidationTests extends OpenSearchTestCase {
 
-    public void testDuplicateFieldAliasAndObject() {
+    public void testDuplicateFieldCorrelationAndObject() {
         ObjectMapper objectMapper = createObjectMapper("some.path");
-        FieldAliasMapper aliasMapper = new FieldAliasMapper("path", "some.path", "field");
+        FieldCorrelationMapper correlationMapper = new FieldCorrelationMapper("path", "some.path", "field", "remoteSchema", "fieldFK");
 
         MapperParsingException e = expectThrows(
             MapperParsingException.class,
-            () -> new MappingLookup(
-                Collections.emptyList(),
-                singletonList(objectMapper),
-                singletonList(aliasMapper),
-                0,
-                Lucene.STANDARD_ANALYZER
-            )
+            () -> new MappingLookup(emptyList(), singletonList(objectMapper), singletonList(correlationMapper), 0, Lucene.STANDARD_ANALYZER)
         );
-        assertEquals("alias [some.path] is defined both as an object and an alias", e.getMessage());
+        assertEquals("correlation [some.path] is defined both as an object and an correlation", e.getMessage());
     }
 
-    public void testDuplicateFieldAliasAndConcreteField() {
+    public void testDuplicateFieldCorrelationAndConcreteField() {
         FieldMapper field = new MockFieldMapper("field");
         FieldMapper invalidField = new MockFieldMapper("invalid");
-        FieldAliasMapper invalidAlias = new FieldAliasMapper("invalid", "invalid", "field");
+        FieldCorrelationMapper invalidCorrelation = new FieldCorrelationMapper("invalid", "invalid", "field", "remoteSchema", "fieldFK");
 
         MapperParsingException e = expectThrows(
             MapperParsingException.class,
             () -> new MappingLookup(
                 Arrays.asList(field, invalidField),
                 emptyList(),
-                singletonList(invalidAlias),
+                singletonList(invalidCorrelation),
                 0,
                 Lucene.STANDARD_ANALYZER
             )
         );
 
-        assertEquals("alias [invalid] is defined both as an alias and a concrete field", e.getMessage());
+        assertEquals("correlation [invalid] is defined both as an correlation and a concrete field", e.getMessage());
     }
 
-    public void testAliasThatRefersToAlias() {
+    public void testCorrelationThatRefersToCorrelation() {
         FieldMapper field = new MockFieldMapper("field");
-        FieldAliasMapper alias = new FieldAliasMapper("alias", "alias", "field");
-        FieldAliasMapper invalidAlias = new FieldAliasMapper("invalid-alias", "invalid-alias", "alias");
+        FieldCorrelationMapper correlation = new FieldCorrelationMapper("correlation", "correlation", "field", "remoteSchema", "fieldFK");
+        FieldCorrelationMapper invalidCorrelation = new FieldCorrelationMapper(
+            "invalid-correlation",
+            "invalid-correlation",
+            "correlation",
+            "remoteSchema",
+            "fieldFK"
+        );
 
         MappingLookup mappers = new MappingLookup(
             singletonList(field),
             emptyList(),
-            Arrays.asList(alias, invalidAlias),
+            Arrays.asList(correlation, invalidCorrelation),
             0,
             Lucene.STANDARD_ANALYZER
         );
-        alias.validate(mappers);
+        correlation.validate(mappers);
 
-        MapperParsingException e = expectThrows(MapperParsingException.class, () -> invalidAlias.validate(mappers));
+        MapperParsingException e = expectThrows(MapperParsingException.class, () -> invalidCorrelation.validate(mappers));
 
         assertEquals(
-            "Invalid [path] value [alias] for field alias [invalid-alias]: an alias" + " cannot refer to another alias.",
+            "Invalid [path] value [correlation] for field correlation [invalid-correlation]: an correlation"
+                + " cannot refer to another correlation.",
             e.getMessage()
         );
     }
 
-    public void testAliasThatRefersToItself() {
-        FieldAliasMapper invalidAlias = new FieldAliasMapper("invalid-alias", "invalid-alias", "invalid-alias");
+    public void testCorrelationThatRefersToItself() {
+        FieldCorrelationMapper invalidCorrelation = new FieldCorrelationMapper(
+            "invalid-correlation",
+            "invalid-correlation",
+            "invalid-correlation",
+            "remoteSchema",
+            "fieldFK"
+        );
 
         MapperParsingException e = expectThrows(MapperParsingException.class, () -> {
-            MappingLookup mappers = new MappingLookup(emptyList(), emptyList(), singletonList(invalidAlias), 0, null);
-            invalidAlias.validate(mappers);
+            MappingLookup mappers = new MappingLookup(emptyList(), emptyList(), singletonList(invalidCorrelation), 0, null);
+            invalidCorrelation.validate(mappers);
         });
 
         assertEquals(
-            "Invalid [path] value [invalid-alias] for field alias [invalid-alias]: an alias" + " cannot refer to itself.",
+            "Invalid [path] value [invalid-correlation] for field correlation [invalid-correlation]: an correlation"
+                + " cannot refer to itself.",
             e.getMessage()
         );
     }
 
-    public void testAliasWithNonExistentPath() {
-        FieldAliasMapper invalidAlias = new FieldAliasMapper("invalid-alias", "invalid-alias", "non-existent");
+    public void testCorrelationWithNonExistentPath() {
+        FieldCorrelationMapper invalidCorrelation = new FieldCorrelationMapper(
+            "invalid-correlation",
+            "invalid-correlation",
+            "non-existent",
+            "remoteSchema",
+            "fieldFK"
+        );
 
         MapperParsingException e = expectThrows(MapperParsingException.class, () -> {
-            MappingLookup mappers = new MappingLookup(emptyList(), emptyList(), singletonList(invalidAlias), 0, Lucene.STANDARD_ANALYZER);
-            invalidAlias.validate(mappers);
+            MappingLookup mappers = new MappingLookup(
+                emptyList(),
+                emptyList(),
+                singletonList(invalidCorrelation),
+                0,
+                Lucene.STANDARD_ANALYZER
+            );
+            invalidCorrelation.validate(mappers);
         });
 
         assertEquals(
-            "Invalid [path] value [non-existent] for field alias [invalid-alias]: an alias"
+            "Invalid [path] value [non-existent] for field correlation [invalid-correlation]: an correlation"
                 + " must refer to an existing field in the mappings.",
             e.getMessage()
         );
     }
 
-    public void testFieldAliasWithNestedScope() {
+    public void testFieldCorrelationWithNestedScope() {
         ObjectMapper objectMapper = createNestedObjectMapper("nested");
-        FieldAliasMapper aliasMapper = new FieldAliasMapper("alias", "nested.alias", "nested.field");
+        FieldCorrelationMapper correlationMapper = new FieldCorrelationMapper(
+            "correlation",
+            "nested.correlation",
+            "nested.field",
+            "remoteSchema",
+            "fieldFK"
+        );
 
         MappingLookup mappers = new MappingLookup(
             singletonList(createFieldMapper("nested", "field")),
             singletonList(objectMapper),
-            singletonList(aliasMapper),
+            singletonList(correlationMapper),
             0,
             Lucene.STANDARD_ANALYZER
         );
-        aliasMapper.validate(mappers);
+        correlationMapper.validate(mappers);
     }
 
-    public void testFieldAliasWithDifferentObjectScopes() {
+    public void testFieldCorrelationWithDifferentObjectScopes() {
 
-        FieldAliasMapper aliasMapper = new FieldAliasMapper("alias", "object2.alias", "object1.field");
+        FieldCorrelationMapper correlationMapper = new FieldCorrelationMapper(
+            "correlation",
+            "object2.correlation",
+            "object1.field",
+            "remoteSchema",
+            "fieldFK"
+        );
 
         MappingLookup mappers = new MappingLookup(
             singletonList(createFieldMapper("object1", "field")),
             Arrays.asList(createObjectMapper("object1"), createObjectMapper("object2")),
-            singletonList(aliasMapper),
+            singletonList(correlationMapper),
             0,
             Lucene.STANDARD_ANALYZER
         );
-        aliasMapper.validate(mappers);
+        correlationMapper.validate(mappers);
     }
 
-    public void testFieldAliasWithNestedTarget() {
+    public void testFieldCorrelationWithNestedTarget() {
         ObjectMapper objectMapper = createNestedObjectMapper("nested");
-        FieldAliasMapper aliasMapper = new FieldAliasMapper("alias", "alias", "nested.field");
+        FieldCorrelationMapper correlationMapper = new FieldCorrelationMapper(
+            "correlation",
+            "correlation",
+            "nested.field",
+            "remoteSchema",
+            "fieldFK"
+        );
 
         IllegalArgumentException e = expectThrows(IllegalArgumentException.class, () -> {
             MappingLookup mappers = new MappingLookup(
                 singletonList(createFieldMapper("nested", "field")),
-                Collections.singletonList(objectMapper),
-                singletonList(aliasMapper),
+                singletonList(objectMapper),
+                singletonList(correlationMapper),
                 0,
                 Lucene.STANDARD_ANALYZER
             );
-            aliasMapper.validate(mappers);
+            correlationMapper.validate(mappers);
         });
 
-        String expectedMessage = "Invalid [path] value [nested.field] for field alias [alias]: "
-            + "an alias must have the same nested scope as its target. The alias is not nested, "
+        String expectedMessage = "Invalid [path] value [nested.field] for field correlation [correlation]: "
+            + "an correlation must have the same nested scope as its target. The correlation is not nested, "
             + "but the target's nested scope is [nested].";
         assertEquals(expectedMessage, e.getMessage());
     }
 
-    public void testFieldAliasWithDifferentNestedScopes() {
-        FieldAliasMapper aliasMapper = new FieldAliasMapper("alias", "nested2.alias", "nested1.field");
+    public void testFieldCorrelationWithDifferentNestedScopes() {
+        FieldCorrelationMapper correlationMapper = new FieldCorrelationMapper(
+            "correlation",
+            "nested2.correlation",
+            "nested1.field",
+            "remoteSchema",
+            "fieldFK"
+        );
 
         IllegalArgumentException e = expectThrows(IllegalArgumentException.class, () -> {
             MappingLookup mappers = new MappingLookup(
                 singletonList(createFieldMapper("nested1", "field")),
                 Arrays.asList(createNestedObjectMapper("nested1"), createNestedObjectMapper("nested2")),
-                singletonList(aliasMapper),
+                singletonList(correlationMapper),
                 0,
                 Lucene.STANDARD_ANALYZER
             );
-            aliasMapper.validate(mappers);
+            correlationMapper.validate(mappers);
         });
 
-        String expectedMessage = "Invalid [path] value [nested1.field] for field alias [nested2.alias]: "
-            + "an alias must have the same nested scope as its target. The alias's nested scope is [nested2], "
+        String expectedMessage = "Invalid [path] value [nested1.field] for field correlation [nested2.correlation]: "
+            + "an correlation must have the same nested scope as its target. The correlation's nested scope is [nested2], "
             + "but the target's nested scope is [nested1].";
         assertEquals(expectedMessage, e.getMessage());
     }

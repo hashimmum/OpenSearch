@@ -40,9 +40,12 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
+import static java.util.Collections.emptyList;
 import static org.hamcrest.Matchers.equalTo;
 
 public class FieldCapabilitiesTests extends AbstractSerializingTestCase<FieldCapabilities> {
@@ -65,9 +68,9 @@ public class FieldCapabilitiesTests extends AbstractSerializingTestCase<FieldCap
 
     public void testBuilder() {
         FieldCapabilities.Builder builder = new FieldCapabilities.Builder("field", "type");
-        builder.add("index1", true, false, Collections.emptyMap());
-        builder.add("index2", true, false, Collections.emptyMap());
-        builder.add("index3", true, false, Collections.emptyMap());
+        builder.add("index1", false, true, false, emptyList(), Collections.emptyMap());
+        builder.add("index2", false, true, false, emptyList(), Collections.emptyMap());
+        builder.add("index3", false, true, false, emptyList(), Collections.emptyMap());
 
         {
             FieldCapabilities cap1 = builder.build(false);
@@ -89,9 +92,9 @@ public class FieldCapabilitiesTests extends AbstractSerializingTestCase<FieldCap
         }
 
         builder = new FieldCapabilities.Builder("field", "type");
-        builder.add("index1", false, true, Collections.emptyMap());
-        builder.add("index2", true, false, Collections.emptyMap());
-        builder.add("index3", false, false, Collections.emptyMap());
+        builder.add("index1", false, false, true, emptyList(), Collections.emptyMap());
+        builder.add("index2", false, true, false, emptyList(), Collections.emptyMap());
+        builder.add("index3", false, false, false, emptyList(), Collections.emptyMap());
         {
             FieldCapabilities cap1 = builder.build(false);
             assertThat(cap1.isSearchable(), equalTo(false));
@@ -112,9 +115,9 @@ public class FieldCapabilitiesTests extends AbstractSerializingTestCase<FieldCap
         }
 
         builder = new FieldCapabilities.Builder("field", "type");
-        builder.add("index1", true, true, Collections.emptyMap());
-        builder.add("index2", true, true, Collections.singletonMap("foo", "bar"));
-        builder.add("index3", true, true, Collections.singletonMap("foo", "quux"));
+        builder.add("index1", false, true, true, emptyList(), Collections.emptyMap());
+        builder.add("index2", false, true, true, Arrays.asList("aliasA", "aliasB"), Collections.singletonMap("foo", "bar"));
+        builder.add("index3", false, true, true, Arrays.asList("aliasB", "aliasC"), Collections.singletonMap("foo", "quux"));
         {
             FieldCapabilities cap1 = builder.build(false);
             assertThat(cap1.isSearchable(), equalTo(true));
@@ -158,6 +161,14 @@ public class FieldCapabilitiesTests extends AbstractSerializingTestCase<FieldCap
             }
         }
 
+        String[] aliasIndices = null;
+        if (randomBoolean()) {
+            aliasIndices = new String[randomIntBetween(0, 3)];
+            for (int i = 0; i < aliasIndices.length; i++) {
+                aliasIndices[i] = randomAlphaOfLengthBetween(5, 20);
+            }
+        }
+
         Map<String, Set<String>> meta;
         switch (randomInt(2)) {
             case 0:
@@ -170,15 +181,30 @@ public class FieldCapabilitiesTests extends AbstractSerializingTestCase<FieldCap
                 meta = Collections.singletonMap("foo", new HashSet<>(Arrays.asList("bar", "baz")));
                 break;
         }
+        String[] aliases;
+        switch (randomInt(2)) {
+            case 0:
+                aliases = new String[] {};
+                break;
+            case 1:
+                aliases = Arrays.asList("foo", "bar").toArray(String[]::new);
+                break;
+            default:
+                aliases = Arrays.asList("foo", "bar", "baz").toArray(String[]::new);
+                break;
+        }
 
         return new FieldCapabilities(
             fieldName,
             randomAlphaOfLengthBetween(5, 20),
             randomBoolean(),
             randomBoolean(),
+            randomBoolean(),
+            aliases,
             indices,
             nonSearchableIndices,
             nonAggregatableIndices,
+            aliasIndices,
             meta
         );
     }
@@ -187,11 +213,14 @@ public class FieldCapabilitiesTests extends AbstractSerializingTestCase<FieldCap
     protected FieldCapabilities mutateInstance(FieldCapabilities instance) {
         String name = instance.getName();
         String type = instance.getType();
+        boolean isAlias = instance.isAlias();
         boolean isSearchable = instance.isSearchable();
         boolean isAggregatable = instance.isAggregatable();
         String[] indices = instance.indices();
         String[] nonSearchableIndices = instance.nonSearchableIndices();
         String[] nonAggregatableIndices = instance.nonAggregatableIndices();
+        String[] aliasIndices = instance.aliasesIndices();
+        String[] aliases = instance.aliases();
         Map<String, Set<String>> meta = instance.meta();
         switch (between(0, 7)) {
             case 0:
@@ -202,6 +231,7 @@ public class FieldCapabilitiesTests extends AbstractSerializingTestCase<FieldCap
                 break;
             case 2:
                 isSearchable = isSearchable == false;
+                isAlias = randomBoolean();
                 break;
             case 3:
                 isAggregatable = isAggregatable == false;
@@ -247,6 +277,19 @@ public class FieldCapabilitiesTests extends AbstractSerializingTestCase<FieldCap
                     newNonAggregatableIndices[i] = randomAlphaOfLengthBetween(5, 20);
                 }
                 nonAggregatableIndices = newNonAggregatableIndices;
+
+                String[] newAliasIndices;
+                int startAliasPos = 0;
+                if (aliasIndices == null) {
+                    newAliasIndices = new String[between(1, 10)];
+                } else {
+                    newAliasIndices = Arrays.copyOf(aliasIndices, aliasIndices.length + between(1, 10));
+                    startAliasPos = aliasIndices.length;
+                }
+                for (int i = startAliasPos; i < newAliasIndices.length; i++) {
+                    newAliasIndices[i] = randomAlphaOfLengthBetween(5, 20);
+                }
+                aliasIndices = newAliasIndices;
                 break;
             case 7:
                 Map<String, Set<String>> newMeta;
@@ -256,10 +299,30 @@ public class FieldCapabilitiesTests extends AbstractSerializingTestCase<FieldCap
                     newMeta = Collections.emptyMap();
                 }
                 meta = newMeta;
+
+                String[] newAliases;
+                if (Objects.isNull(aliases)) {
+                    newAliases = List.of("foo").toArray(String[]::new);
+                } else {
+                    newAliases = new String[] {};
+                }
+                aliases = newAliases;
                 break;
             default:
                 throw new AssertionError();
         }
-        return new FieldCapabilities(name, type, isSearchable, isAggregatable, indices, nonSearchableIndices, nonAggregatableIndices, meta);
+        return new FieldCapabilities(
+            name,
+            type,
+            isAlias,
+            isSearchable,
+            isAggregatable,
+            aliases,
+            indices,
+            nonSearchableIndices,
+            nonAggregatableIndices,
+            aliasIndices,
+            meta
+        );
     }
 }

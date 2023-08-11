@@ -41,6 +41,8 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.List;
+import java.util.ArrayList;
 import java.util.Set;
 
 /**
@@ -48,10 +50,11 @@ import java.util.Set;
  *
  * @opensearch.internal
  */
-class FieldTypeLookup implements Iterable<MappedFieldType> {
+public class FieldTypeLookup implements Iterable<MappedFieldType> {
 
     private final Map<String, MappedFieldType> fullNameToFieldType = new HashMap<>();
     private final Map<String, String> aliasToConcreteName = new HashMap<>();
+    private final Map<String, List<String>> concreteToAliasName = new HashMap<>();
 
     /**
      * A map from field name to all fields whose content has been copied into it
@@ -68,6 +71,14 @@ class FieldTypeLookup implements Iterable<MappedFieldType> {
     }
 
     FieldTypeLookup(Collection<FieldMapper> fieldMappers, Collection<FieldAliasMapper> fieldAliasMappers) {
+        this(fieldMappers, fieldAliasMappers, Collections.emptyList());
+    }
+
+    FieldTypeLookup(
+        Collection<FieldMapper> fieldMappers,
+        Collection<FieldAliasMapper> fieldAliasMappers,
+        Collection<FieldCorrelationMapper> fieldCorrelationMappers
+    ) {
         Map<String, DynamicKeyFieldMapper> dynamicKeyMappers = new HashMap<>();
 
         for (FieldMapper fieldMapper : fieldMappers) {
@@ -90,9 +101,13 @@ class FieldTypeLookup implements Iterable<MappedFieldType> {
         }
 
         for (FieldAliasMapper fieldAliasMapper : fieldAliasMappers) {
-            String aliasName = fieldAliasMapper.name();
-            String path = fieldAliasMapper.path();
-            aliasToConcreteName.put(aliasName, path);
+            aliasToConcreteName.put(fieldAliasMapper.name(), fieldAliasMapper.path());
+            concreteToAliasName.computeIfAbsent(fieldAliasMapper.path(), k -> new ArrayList<>()).add(fieldAliasMapper.name());
+        }
+
+        for (FieldCorrelationMapper fieldCorrelationMapper : fieldCorrelationMappers) {
+            aliasToConcreteName.put(fieldCorrelationMapper.name(), fieldCorrelationMapper.path());
+            concreteToAliasName.computeIfAbsent(fieldCorrelationMapper.path(), k -> new ArrayList<>()).add(fieldCorrelationMapper.name());
         }
 
         this.dynamicKeyLookup = new DynamicKeyFieldTypeLookup(dynamicKeyMappers, aliasToConcreteName);
@@ -111,6 +126,20 @@ class FieldTypeLookup implements Iterable<MappedFieldType> {
         // If the mapping contains fields that support dynamic sub-key lookup, check
         // if this could correspond to a keyed field of the form 'path_to_field.path_to_key'.
         return dynamicKeyLookup.get(field);
+    }
+
+    /**
+     * Returns the field type aliase's for the given field name.
+     */
+    public List<String> getAliases(String field) {
+        return concreteToAliasName.getOrDefault(field, Collections.emptyList());
+    }
+
+    /**
+     * returns whether is field name is an alias for another field
+     */
+    public boolean isAlias(String field) {
+        return aliasToConcreteName.containsKey(field);
     }
 
     /**
@@ -162,4 +191,5 @@ class FieldTypeLookup implements Iterable<MappedFieldType> {
         Iterator<MappedFieldType> keyedFieldTypes = dynamicKeyLookup.fieldTypes();
         return Iterators.concat(concreteFieldTypes, keyedFieldTypes);
     }
+
 }

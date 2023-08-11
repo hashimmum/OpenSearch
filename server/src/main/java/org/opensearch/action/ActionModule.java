@@ -162,6 +162,9 @@ import org.opensearch.action.admin.indices.mapping.get.GetMappingsAction;
 import org.opensearch.action.admin.indices.mapping.get.TransportGetFieldMappingsAction;
 import org.opensearch.action.admin.indices.mapping.get.TransportGetFieldMappingsIndexAction;
 import org.opensearch.action.admin.indices.mapping.get.TransportGetMappingsAction;
+import org.opensearch.action.admin.indices.mapping.get.TransportGetFieldAliasesMappingsIndexAction;
+import org.opensearch.action.admin.indices.mapping.get.TransportGetFieldAliasesMappingsAction;
+import org.opensearch.action.admin.indices.mapping.get.GetFieldAliasesMappingsAction;
 import org.opensearch.action.admin.indices.mapping.put.AutoPutMappingAction;
 import org.opensearch.action.admin.indices.mapping.put.PutMappingAction;
 import org.opensearch.action.admin.indices.mapping.put.PutMappingRequest;
@@ -380,6 +383,7 @@ import org.opensearch.rest.action.admin.indices.RestGetAliasesAction;
 import org.opensearch.rest.action.admin.indices.RestGetComponentTemplateAction;
 import org.opensearch.rest.action.admin.indices.RestGetComposableIndexTemplateAction;
 import org.opensearch.rest.action.admin.indices.RestGetDataStreamsAction;
+import org.opensearch.rest.action.admin.indices.RestGetFieldAliasesMappingAction;
 import org.opensearch.rest.action.admin.indices.RestGetFieldMappingAction;
 import org.opensearch.rest.action.admin.indices.RestGetIndexTemplateAction;
 import org.opensearch.rest.action.admin.indices.RestGetIndicesAction;
@@ -645,6 +649,11 @@ public class ActionModule extends AbstractModule {
             TransportGetFieldMappingsAction.class,
             TransportGetFieldMappingsIndexAction.class
         );
+        actions.register(
+            GetFieldAliasesMappingsAction.INSTANCE,
+            TransportGetFieldAliasesMappingsAction.class,
+            TransportGetFieldAliasesMappingsIndexAction.class
+        );
         actions.register(PutMappingAction.INSTANCE, TransportPutMappingAction.class);
         actions.register(AutoPutMappingAction.INSTANCE, TransportAutoPutMappingAction.class);
         actions.register(IndicesAliasesAction.INSTANCE, TransportIndicesAliasesAction.class);
@@ -848,6 +857,7 @@ public class ActionModule extends AbstractModule {
         registerHandler.accept(new RestPutMappingAction());
         registerHandler.accept(new RestGetMappingAction(threadPool));
         registerHandler.accept(new RestGetFieldMappingAction());
+        registerHandler.accept(new RestGetFieldAliasesMappingAction());
 
         registerHandler.accept(new RestRefreshAction());
         registerHandler.accept(new RestFlushAction());

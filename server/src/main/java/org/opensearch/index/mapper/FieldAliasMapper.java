@@ -38,8 +38,11 @@ import org.opensearch.common.xcontent.support.XContentMapValues;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Iterator;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+
+import static java.lang.String.format;
 
 /**
  * A mapper for field aliases.
@@ -49,7 +52,7 @@ import java.util.Objects;
  *
  * @opensearch.internal
  */
-public final class FieldAliasMapper extends Mapper {
+public class FieldAliasMapper extends Mapper {
     public static final String CONTENT_TYPE = "alias";
 
     /**
@@ -70,6 +73,10 @@ public final class FieldAliasMapper extends Mapper {
         this.path = path;
     }
 
+    public String contentType() {
+        return CONTENT_TYPE;
+    }
+
     @Override
     public String name() {
         return name;
@@ -88,7 +95,13 @@ public final class FieldAliasMapper extends Mapper {
     public Mapper merge(Mapper mergeWith) {
         if (!(mergeWith instanceof FieldAliasMapper)) {
             throw new IllegalArgumentException(
-                "Cannot merge a field alias mapping [" + name() + "] with a mapping that is not for a field alias."
+                format(
+                    Locale.ROOT,
+                    "Cannot merge a field %s mapping [%s] with a mapping that is not for a field %s.",
+                    contentType(),
+                    name(),
+                    contentType()
+                )
             );
         }
         return mergeWith;
@@ -108,21 +121,39 @@ public final class FieldAliasMapper extends Mapper {
     public void validate(MappingLookup mappers) {
         if (Objects.equals(this.path(), this.name())) {
             throw new MapperParsingException(
-                "Invalid [path] value [" + path + "] for field alias [" + name() + "]: an alias cannot refer to itself."
+                format(
+                    Locale.ROOT,
+                    "Invalid [path] value [%s] for field %s [%s]: an %s cannot refer to itself.",
+                    path(),
+                    contentType(),
+                    name(),
+                    contentType()
+                )
             );
         }
         if (mappers.fieldTypes().get(path) == null) {
             throw new MapperParsingException(
-                "Invalid [path] value ["
-                    + path
-                    + "] for field alias ["
-                    + name()
-                    + "]: an alias must refer to an existing field in the mappings."
+                format(
+                    Locale.ROOT,
+                    "Invalid [path] value [%s] for field %s [%s]: an %s must refer to an existing field in the mappings.",
+                    path(),
+                    contentType(),
+                    name(),
+                    contentType()
+                )
             );
         }
         if (mappers.getMapper(path) instanceof FieldAliasMapper) {
             throw new MapperParsingException(
-                "Invalid [path] value [" + path + "] for field alias [" + name() + "]: an alias cannot refer to another alias."
+                format(
+                    Locale.ROOT,
+                    "Invalid [path] value [%s] for field %s [%s]: an %s cannot refer to another %s.",
+                    path(),
+                    contentType(),
+                    name(),
+                    contentType(),
+                    contentType()
+                )
             );
         }
         String aliasScope = mappers.getNestedScope(name);
@@ -130,15 +161,24 @@ public final class FieldAliasMapper extends Mapper {
 
         if (!Objects.equals(aliasScope, pathScope)) {
             StringBuilder message = new StringBuilder(
-                "Invalid [path] value ["
-                    + path
-                    + "] for field alias ["
-                    + name
-                    + "]: an alias must have the same nested scope as its target. "
+                format(
+                    Locale.ROOT,
+                    "Invalid [path] value [%s] for field %s [%s]: an %s must have the same nested scope as its target. ",
+                    path(),
+                    contentType(),
+                    name(),
+                    contentType()
+                )
             );
-            message.append(aliasScope == null ? "The alias is not nested" : "The alias's nested scope is [" + aliasScope + "]");
+            message.append(
+                aliasScope == null
+                    ? format(Locale.ROOT, "The %s is not nested", contentType())
+                    : format(Locale.ROOT, "The %s's nested scope is [%s]", contentType(), aliasScope)
+            );
             message.append(", but ");
-            message.append(pathScope == null ? "the target is not nested." : "the target's nested scope is [" + pathScope + "].");
+            message.append(
+                pathScope == null ? "the target is not nested." : format(Locale.ROOT, "the target's nested scope is [%s].", pathScope)
+            );
             throw new IllegalArgumentException(message.toString());
         }
     }
@@ -167,8 +207,8 @@ public final class FieldAliasMapper extends Mapper {
      * @opensearch.internal
      */
     public static class Builder extends Mapper.Builder<FieldAliasMapper.Builder> {
-        private String name;
-        private String path;
+        protected String name;
+        protected String path;
 
         protected Builder(String name) {
             super(name);

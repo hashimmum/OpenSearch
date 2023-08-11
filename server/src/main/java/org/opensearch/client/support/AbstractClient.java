@@ -232,6 +232,10 @@ import org.opensearch.action.admin.indices.get.GetIndexAction;
 import org.opensearch.action.admin.indices.get.GetIndexRequest;
 import org.opensearch.action.admin.indices.get.GetIndexRequestBuilder;
 import org.opensearch.action.admin.indices.get.GetIndexResponse;
+import org.opensearch.action.admin.indices.mapping.get.GetFieldAliasesMappingsAction;
+import org.opensearch.action.admin.indices.mapping.get.GetFieldAliasesMappingsRequest;
+import org.opensearch.action.admin.indices.mapping.get.GetFieldAliasesMappingsRequestBuilder;
+import org.opensearch.action.admin.indices.mapping.get.GetFieldAliasesMappingsResponse;
 import org.opensearch.action.admin.indices.mapping.get.GetFieldMappingsAction;
 import org.opensearch.action.admin.indices.mapping.get.GetFieldMappingsRequest;
 import org.opensearch.action.admin.indices.mapping.get.GetFieldMappingsRequestBuilder;
@@ -1713,6 +1717,19 @@ public abstract class AbstractClient implements Client {
         }
 
         @Override
+        public void getFieldAliasesMappings(
+            GetFieldAliasesMappingsRequest request,
+            ActionListener<GetFieldAliasesMappingsResponse> listener
+        ) {
+            execute(GetFieldAliasesMappingsAction.INSTANCE, request, listener);
+        }
+
+        @Override
+        public GetFieldAliasesMappingsRequestBuilder prepareGetFieldAliasesMappings(String... indices) {
+            return new GetFieldAliasesMappingsRequestBuilder(this, GetFieldAliasesMappingsAction.INSTANCE, indices);
+        }
+
+        @Override
         public GetMappingsRequestBuilder prepareGetMappings(String... indices) {
             return new GetMappingsRequestBuilder(this, GetMappingsAction.INSTANCE, indices);
         }
@@ -1725,6 +1742,11 @@ public abstract class AbstractClient implements Client {
         @Override
         public GetFieldMappingsRequestBuilder prepareGetFieldMappings(String... indices) {
             return new GetFieldMappingsRequestBuilder(this, GetFieldMappingsAction.INSTANCE, indices);
+        }
+
+        @Override
+        public ActionFuture<GetFieldAliasesMappingsResponse> getFieldAliasesMappings(GetFieldAliasesMappingsRequest request) {
+            return execute(GetFieldAliasesMappingsAction.INSTANCE, request);
         }
 
         @Override

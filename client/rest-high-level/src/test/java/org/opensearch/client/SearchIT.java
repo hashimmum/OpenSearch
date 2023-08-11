@@ -1469,9 +1469,12 @@ public class SearchIT extends OpenSearchRestHighLevelClientTestCase {
         FieldCapabilities expectedKeywordCapabilities = new FieldCapabilities(
             "rating",
             "keyword",
+            false,
             true,
             true,
+            null,
             new String[] { "index2" },
+            null,
             null,
             null,
             Collections.emptyMap()
@@ -1481,9 +1484,12 @@ public class SearchIT extends OpenSearchRestHighLevelClientTestCase {
         FieldCapabilities expectedLongCapabilities = new FieldCapabilities(
             "rating",
             "long",
+            false,
             true,
             true,
+            null,
             new String[] { "index1" },
+            null,
             null,
             null,
             Collections.emptyMap()
@@ -1498,8 +1504,11 @@ public class SearchIT extends OpenSearchRestHighLevelClientTestCase {
         FieldCapabilities expectedTextCapabilities = new FieldCapabilities(
             "field",
             "text",
+            false,
             true,
             false,
+            null,
+            null,
             null,
             null,
             null,

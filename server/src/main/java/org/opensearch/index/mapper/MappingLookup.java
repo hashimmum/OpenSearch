@@ -43,8 +43,12 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
+
+import static java.lang.String.format;
 
 /**
  * Looks up a mapping for a field
@@ -140,10 +144,26 @@ public final class MappingLookup implements Iterable<Mapper> {
 
         for (FieldAliasMapper aliasMapper : aliasMappers) {
             if (objects.containsKey(aliasMapper.name())) {
-                throw new MapperParsingException("Alias [" + aliasMapper.name() + "] is defined both as an object and an alias");
+                throw new MapperParsingException(
+                    format(
+                        Locale.ROOT,
+                        "%s [%s] is defined both as an object and an %s",
+                        aliasMapper.contentType(),
+                        aliasMapper.name(),
+                        aliasMapper.contentType()
+                    )
+                );
             }
             if (fieldMappers.put(aliasMapper.name(), aliasMapper) != null) {
-                throw new MapperParsingException("Alias [" + aliasMapper.name() + "] is defined both as an alias and a concrete field");
+                throw new MapperParsingException(
+                    format(
+                        Locale.ROOT,
+                        "%s [%s] is defined both as an %s and a concrete field",
+                        aliasMapper.contentType(),
+                        aliasMapper.name(),
+                        aliasMapper.contentType()
+                    )
+                );
             }
         }
 
@@ -162,6 +182,10 @@ public final class MappingLookup implements Iterable<Mapper> {
      */
     public Mapper getMapper(String field) {
         return fieldMappers.get(field);
+    }
+
+    public List<Mapper> getMappers(List<String> fields) {
+        return fields.stream().map(this::getMapper).collect(Collectors.toList());
     }
 
     public FieldTypeLookup fieldTypes() {
@@ -278,4 +302,5 @@ public final class MappingLookup implements Iterable<Mapper> {
         }
         return field.substring(0, lastDot);
     }
+
 }
