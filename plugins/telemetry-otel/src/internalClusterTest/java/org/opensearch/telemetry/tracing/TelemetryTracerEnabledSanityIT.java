@@ -82,14 +82,14 @@ public class TelemetryTracerEnabledSanityIT extends OpenSearchIntegTestCase {
             Arrays.asList(
                 new AllSpansAreEndedProperly(),
                 new AllSpansHaveUniqueId(),
-                new NumberOfTraceIDsEqualToRequests(Attributes.create().addAttribute("action", "indices:data/read/search[phase/query]")),
+                new NumberOfTraceIDsEqualToRequests(Attributes.create().addAttribute("action", "indices:data/read/search")),
                 new TotalRootSpansEqualToRequests()
             )
         );
 
         InMemorySingletonSpanExporter exporter = InMemorySingletonSpanExporter.INSTANCE;
         if (!exporter.getFinishedSpanItems().isEmpty()) {
-            validators.validate(exporter.getFinishedSpanItems(), 6);
+            validators.validate(exporter.getFinishedSpanItems(), 2);
         }
     }
 
