@@ -1,0 +1,259 @@
+---
+# The test setup includes:
+# - Create flat_object mapping for test_flat_object index to test five parameters:
+# - Create test_flat_object1 index to test edge cases:
+# - Index example documents
+# - Refresh the index so it is ready for search tests
+
+setup:
+# index test_flat_object
+  - do:
+      indices.create:
+        index: test_flat_object
+        body:
+          mappings:
+            properties:
+              issue:
+                properties:
+                  labels:
+                    type: flat_object
+                    normalizer: lowercase
+                    null_value: abc
+                    depth_limit: 3
+                    ignore_above: 3
+                    doc_values: false
+                    similarity: boolean
+
+  - do:
+      index:
+        index: test_flat_object
+        id: 1
+        body: {
+          "issue": {
+            "labels": {
+              "version": "2.2",
+              "backport": [
+                "2.0",
+                "1.9"
+              ],
+              "category": {
+                "type": "API",
+                "level": "bug"
+              },
+              "createdDate": "2023-01-01",
+              "comment": [ [ "Doe","Shipped" ],[ "John","Approved" ] ],
+              "views": 288,
+              "priority": 5.00
+            }
+          }
+        }
+
+  - do:
+      index:
+        index: test_flat_object
+        id: 2
+        body: {
+          "issue": {
+            "labels": "va1"
+          }
+        }
+
+  - do:
+      indices.refresh:
+        index: test_flat_object
+
+  - do:
+      index:
+        index: test_flat_object
+        id: 3
+        body: {
+          "issue": {
+            "labels": null
+          }
+        }
+
+  - do:
+      indices.refresh:
+        index: test_flat_object
+
+# index test_flat_object1
+  - do:
+      indices.create:
+        index: test_flat_object1
+        body:
+          mappings:
+            properties:
+              issue:
+                properties:
+                  labels:
+                    type: flat_object
+                    ignore_above: -22
+
+  - do:
+      index:
+        index: test_flat_object1
+        id: 1
+        body: {
+          "issue": {
+            "labels": {
+              "category": {
+                "name1": "aa"
+              }
+            }
+          }
+        }
+
+  - do:
+      indices.refresh:
+        index: test_flat_object1
+
+---
+# Delete Index when connection is teardown
+teardown:
+  - do:
+      indices.delete:
+        index: test_flat_object
+  - do:
+      indices.delete:
+        index: test_flat_object1
+
+---
+# Verify that mappings under the catalog field did not expand
+# and no dynamic fields were created.
+"Mappings":
+  - skip:
+      version: " - 2.99.99"
+      reason: "flat_object is introduced in 3.0.0 in main branch"
+
+  - do:
+      indices.get_mapping:
+        index: test_flat_object
+  - is_true: test_flat_object.mappings
+  - match: { test_flat_object.mappings.properties.issue.properties.labels.type: flat_object }
+  # https://github.com/opensearch-project/OpenSearch/tree/main/rest-api-spec/src/main/resources/rest-api-spec/test#length
+  - length: { test_flat_object.mappings.properties.issue.properties: 1 }
+  - length: { test_flat_object.mappings.properties.issue.properties.labels: 7 }
+
+---
+"Supported queries":
+  - skip:
+      version: " - 2.99.99"
+      reason: "flat_object is introduced in 3.0.0 in main branch"
+
+  # Verify Document Count
+  - do:
+      search:
+        index: test_flat_object,
+        body: {
+          query: {
+            match_all: { }
+          }
+        }
+
+  - length: { hits.hits: 3 }
+
+  - do:
+      search:
+        index: test_flat_object1,
+        body: {
+          query: {
+            match_all: { }
+          }
+        }
+
+  - length: { hits.hits: 1 }
+
+  # test ignore_above=4.
+  - do:
+      search:
+        index: test_flat_object,
+        body: {
+          _source: true,
+          query: {
+            term: { issue.labels: "API" }
+          }
+        }
+
+  - length: { hits.hits: 1 }
+  - match: { hits.hits.0._source.issue.labels.category.type: "API" }
+
+  - do:
+      search:
+        index: test_flat_object,
+        body: {
+          _source: true,
+          query: {
+            term: { issue.labels: "Approved" }
+          }
+        }
+
+  - length: { hits.hits: 0 }
+
+  # test ignore_above=-22.
+  - do:
+      search:
+        index: test_flat_object1,
+        body: {
+          _source: true,
+          query: {
+            term: { issue.labels: "aa" }
+          }
+        }
+
+  - length: { hits.hits: 0 }
+
+  # test null_value="abc".
+  - do:
+      search:
+        index: test_flat_object,
+        body: {
+          _source: true,
+          query: {
+            term: { issue.labels: "abc" }
+          }
+        }
+
+  - length: { hits.hits: 1 }
+  - match: { hits.hits.0._source.issue.labels: null }
+
+  - do:
+      search:
+        index: test_flat_object,
+        body: {
+          _source: true,
+          query: {
+            exists: { field: "issue.labels" }
+          }
+        }
+
+  - length: { hits.hits: 3 }
+  - match: { hits.hits.1._source.issue.labels: "va1" }
+  - match: { hits.hits.2._source.issue.labels: null }
+
+  # test normalizer=lowercase.
+  - do:
+      search:
+        index: test_flat_object,
+        body: {
+          _source: true,
+          query: {
+            term: { issue.labels: "api" }
+          }
+        }
+
+  - length: { hits.hits: 1 }
+  - match: { hits.hits.0._source.issue.labels.category.type: "API" }
+
+  # test no nested value.
+  - do:
+      search:
+        index: test_flat_object,
+        body: {
+          _source: true,
+          query: {
+            term: { issue.labels: "va1" }
+          }
+        }
+
+  - length: { hits.hits: 1 }
+  - match: { hits.hits.0._source.issue.labels: "va1" }
