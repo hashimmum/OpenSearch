@@ -149,6 +149,7 @@ import org.opensearch.ratelimitting.admissioncontrol.settings.CpuBasedAdmissionC
 import org.opensearch.ratelimitting.admissioncontrol.settings.IoBasedAdmissionControllerSettings;
 import org.opensearch.repositories.fs.FsRepository;
 import org.opensearch.rest.BaseRestHandler;
+import org.opensearch.rest.action.admin.cluster.RestClusterStatsAction;
 import org.opensearch.script.ScriptService;
 import org.opensearch.search.SearchService;
 import org.opensearch.search.aggregations.MultiBucketConsumerService;
@@ -754,7 +755,9 @@ public final class ClusterSettings extends AbstractScopedSettings {
                 RemoteStoreSettings.CLUSTER_REMOTE_STORE_PATH_HASH_ALGORITHM_SETTING,
                 RemoteStoreSettings.CLUSTER_REMOTE_MAX_TRANSLOG_READERS,
                 RemoteStoreSettings.CLUSTER_REMOTE_STORE_TRANSLOG_METADATA,
-                SearchService.CLUSTER_ALLOW_DERIVED_FIELD_SETTING
+                SearchService.CLUSTER_ALLOW_DERIVED_FIELD_SETTING,
+
+                RestClusterStatsAction.CLUSTER_STATS_LEVEL_SETTING
             )
         )
     );
