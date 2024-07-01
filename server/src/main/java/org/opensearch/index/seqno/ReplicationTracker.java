@@ -1252,9 +1252,8 @@ public class ReplicationTracker extends AbstractIndexShardComponent implements L
     }
 
     private boolean isPrimaryRelocation(String allocationId) {
-        Optional<ShardRouting> shardRouting = routingTable.shards()
+        Optional<ShardRouting> shardRouting = routingTable.assignedShards()
             .stream()
-            .filter(routing -> Objects.nonNull(routing.allocationId().getId()))
             .filter(routing -> routing.allocationId().getId().equals(allocationId))
             .findAny();
         return shardRouting.isPresent() && shardRouting.get().primary();
