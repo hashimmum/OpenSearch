@@ -42,6 +42,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
@@ -49,8 +50,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import static java.util.Arrays.asList;
-import static org.opensearch.test.OpenSearchIntegTestCase.client;
-import static org.opensearch.test.OpenSearchTestCase.assertBusy;
 import static org.opensearch.test.hamcrest.OpenSearchAssertions.assertHitCount;
 
 public class SegmentReplicationBaseIT extends OpenSearchIntegTestCase {
@@ -244,5 +243,12 @@ public class SegmentReplicationBaseIT extends OpenSearchIntegTestCase {
         try (final GatedCloseable<SegmentInfos> closeable = tuple.v1()) {
             return closeable.get();
         }
+    }
+
+    protected boolean warmIndexSegmentReplicationEnabled() {
+        return Objects.equals(
+            IndexModule.INDEX_STORE_LOCALITY_SETTING.get(indexSettings()).toString(),
+            IndexModule.DataLocalityType.PARTIAL.name()
+        );
     }
 }
