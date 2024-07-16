@@ -151,7 +151,7 @@ public class PeerRecoveryRetentionLeaseExpiryTests extends ReplicationTrackerTes
         assertThat(
             leaseIds,
             equalTo(
-                replicationTracker.routingTable.shards()
+                replicationTracker.routingTable.assignedShards()
                     .stream()
                     .map(ReplicationTracker::getPeerRecoveryRetentionLeaseId)
                     .collect(Collectors.toSet())
@@ -183,7 +183,7 @@ public class PeerRecoveryRetentionLeaseExpiryTests extends ReplicationTrackerTes
             equalTo(
                 Stream.concat(
                     Stream.of(ReplicationTracker.getPeerRecoveryRetentionLeaseId(unknownNodeId)),
-                    replicationTracker.routingTable.shards().stream().map(ReplicationTracker::getPeerRecoveryRetentionLeaseId)
+                    replicationTracker.routingTable.assignedShards().stream().map(ReplicationTracker::getPeerRecoveryRetentionLeaseId)
                 ).collect(Collectors.toSet())
             )
         );
@@ -215,7 +215,7 @@ public class PeerRecoveryRetentionLeaseExpiryTests extends ReplicationTrackerTes
         assertThat(
             leaseIds,
             equalTo(
-                replicationTracker.routingTable.shards()
+                replicationTracker.routingTable.assignedShards()
                     .stream()
                     .map(ReplicationTracker::getPeerRecoveryRetentionLeaseId)
                     .collect(Collectors.toSet())
@@ -244,7 +244,7 @@ public class PeerRecoveryRetentionLeaseExpiryTests extends ReplicationTrackerTes
         assertThat(
             leaseIds,
             equalTo(
-                replicationTracker.routingTable.shards()
+                replicationTracker.routingTable.assignedShards()
                     .stream()
                     .map(ReplicationTracker::getPeerRecoveryRetentionLeaseId)
                     .collect(Collectors.toSet())
@@ -271,7 +271,7 @@ public class PeerRecoveryRetentionLeaseExpiryTests extends ReplicationTrackerTes
         assertThat(
             leaseIds,
             equalTo(
-                replicationTracker.routingTable.shards()
+                replicationTracker.routingTable.assignedShards()
                     .stream()
                     .map(ReplicationTracker::getPeerRecoveryRetentionLeaseId)
                     .collect(Collectors.toSet())
