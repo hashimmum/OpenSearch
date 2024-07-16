@@ -107,7 +107,11 @@ public abstract class ReplicationTrackerTestCase extends OpenSearchTestCase {
         return routingTable(initializingIds, Collections.singleton(primaryId), primaryId, false);
     }
 
-    static IndexShardRoutingTable routingTable(final Set<AllocationId> initializingIds, final AllocationId primaryId, final boolean shouldAddUnassignedShard) {
+    static IndexShardRoutingTable routingTable(
+        final Set<AllocationId> initializingIds,
+        final AllocationId primaryId,
+        final boolean shouldAddUnassignedShard
+    ) {
         return routingTable(initializingIds, Collections.singleton(primaryId), primaryId, shouldAddUnassignedShard);
     }
 
@@ -143,7 +147,9 @@ public abstract class ReplicationTrackerTestCase extends OpenSearchTestCase {
 
         // Add a shard that is unassigned to simulate #11945
         if (shouldAddUnassignedShard) {
-            builder.addShard(TestShardRouting.newShardRoutingWithNullAllocationId(shardId, null, null, false, ShardRoutingState.UNASSIGNED));
+            builder.addShard(
+                TestShardRouting.newShardRoutingWithNullAllocationId(shardId, null, null, false, ShardRoutingState.UNASSIGNED)
+            );
         }
 
         for (final AllocationId initializingId : initializingIds) {
