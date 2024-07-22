@@ -104,13 +104,22 @@ public abstract class ReplicationTrackerTestCase extends OpenSearchTestCase {
     }
 
     static IndexShardRoutingTable routingTable(final Set<AllocationId> initializingIds, final AllocationId primaryId) {
-        return routingTable(initializingIds, Collections.singleton(primaryId), primaryId);
+        return routingTable(initializingIds, Collections.singleton(primaryId), primaryId, false);
+    }
+
+    static IndexShardRoutingTable routingTable(
+        final Set<AllocationId> initializingIds,
+        final AllocationId primaryId,
+        final boolean shouldAddUnassignedShard
+    ) {
+        return routingTable(initializingIds, Collections.singleton(primaryId), primaryId, shouldAddUnassignedShard);
     }
 
     static IndexShardRoutingTable routingTable(
         final Set<AllocationId> initializingIds,
         final Set<AllocationId> activeIds,
-        final AllocationId primaryId
+        final AllocationId primaryId,
+        final boolean shouldAddUnassignedShard
     ) {
         final ShardId shardId = new ShardId("test", "_na_", 0);
         final ShardRouting primaryShard = TestShardRouting.newShardRouting(
@@ -121,19 +130,28 @@ public abstract class ReplicationTrackerTestCase extends OpenSearchTestCase {
             ShardRoutingState.STARTED,
             primaryId
         );
-        return routingTable(initializingIds, activeIds, primaryShard);
+        return routingTable(initializingIds, activeIds, primaryShard, shouldAddUnassignedShard);
     }
 
     static IndexShardRoutingTable routingTable(
         final Set<AllocationId> initializingIds,
         final Set<AllocationId> activeIds,
-        final ShardRouting primaryShard
+        final ShardRouting primaryShard,
+        final boolean shouldAddUnassignedShard
     ) {
         assert initializingIds != null && activeIds != null;
         assert !initializingIds.contains(primaryShard.allocationId());
         assert activeIds.contains(primaryShard.allocationId());
         final ShardId shardId = new ShardId("test", "_na_", 0);
         final IndexShardRoutingTable.Builder builder = new IndexShardRoutingTable.Builder(shardId);
+
+        // Add a shard that is unassigned to simulate #11945
+        if (shouldAddUnassignedShard) {
+            builder.addShard(
+                TestShardRouting.newShardRoutingWithNullAllocationId(shardId, null, null, false, ShardRoutingState.UNASSIGNED)
+            );
+        }
+
         for (final AllocationId initializingId : initializingIds) {
             builder.addShard(
                 TestShardRouting.newShardRouting(
@@ -146,6 +164,7 @@ public abstract class ReplicationTrackerTestCase extends OpenSearchTestCase {
                 )
             );
         }
+
         for (final AllocationId activeId : activeIds) {
             if (activeId.equals(primaryShard.allocationId())) {
                 continue;
