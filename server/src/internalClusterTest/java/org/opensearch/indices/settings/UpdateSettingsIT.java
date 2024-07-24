@@ -835,6 +835,7 @@ public class UpdateSettingsIT extends OpenSearchIntegTestCase {
 
     public void testNullReplicaUpdate() {
         internalCluster().ensureAtLeastNumDataNodes(2);
+
         // cluster setting
         String defaultNumberOfReplica = "3";
         assertAcked(
@@ -844,7 +845,7 @@ public class UpdateSettingsIT extends OpenSearchIntegTestCase {
                 .setPersistentSettings(Settings.builder().put("cluster.default_number_of_replicas", defaultNumberOfReplica))
                 .get()
         );
-
+        // create index with number of replicas will ignore default value
         assertAcked(
             client().admin()
                 .indices()
@@ -858,7 +859,7 @@ public class UpdateSettingsIT extends OpenSearchIntegTestCase {
             .get()
             .getSetting("test", IndexMetadata.SETTING_NUMBER_OF_REPLICAS);
         assertEquals("2", numberOfReplicas);
-
+        // update setting with null replica will use cluster setting of replica number
         assertAcked(
             client().admin()
                 .indices()
@@ -872,12 +873,27 @@ public class UpdateSettingsIT extends OpenSearchIntegTestCase {
             .get()
             .getSetting("test", IndexMetadata.SETTING_NUMBER_OF_REPLICAS);
         assertEquals(defaultNumberOfReplica, numberOfReplicas);
+
+        // Clean up cluster setting, then update setting with null replica should pick up default value of 1
         assertAcked(
             client().admin()
                 .cluster()
                 .prepareUpdateSettings()
                 .setPersistentSettings(Settings.builder().putNull("cluster.default_number_of_replicas"))
         );
+        assertAcked(
+            client().admin()
+                .indices()
+                .prepareUpdateSettings("test")
+                .setSettings(Settings.builder().putNull(IndexMetadata.SETTING_NUMBER_OF_REPLICAS))
+        );
+
+        numberOfReplicas = client().admin()
+            .indices()
+            .prepareGetSettings("test")
+            .get()
+            .getSetting("test", IndexMetadata.SETTING_NUMBER_OF_REPLICAS);
+        assertEquals("1", numberOfReplicas);
     }
 
     public void testNoopUpdate() {
