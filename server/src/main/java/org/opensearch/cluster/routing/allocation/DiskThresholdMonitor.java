@@ -40,7 +40,9 @@ import org.opensearch.client.Client;
 import org.opensearch.cluster.ClusterInfo;
 import org.opensearch.cluster.ClusterState;
 import org.opensearch.cluster.DiskUsage;
+import org.opensearch.cluster.block.ClusterBlock;
 import org.opensearch.cluster.block.ClusterBlockLevel;
+import org.opensearch.cluster.block.ClusterBlocks;
 import org.opensearch.cluster.metadata.IndexMetadata;
 import org.opensearch.cluster.metadata.Metadata;
 import org.opensearch.cluster.routing.RerouteService;
@@ -253,6 +255,9 @@ public class DiskThresholdMonitor {
                     }
 
                 } else {
+                    for (Map.Entry<String, Set<ClusterBlock>> indexBlockEntry : state.blocks().indices().entrySet()) {
+                        state.blocks().removeIndexBlock(indexBlockEntry.getKey(), IndexMetadata.INDEX_READ_ONLY_ALLOW_DELETE_BLOCK);
+                    }
 
                     nodesOverHighThresholdAndRelocating.remove(node);
 
