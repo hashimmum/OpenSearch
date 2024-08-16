@@ -67,9 +67,9 @@ public class ClusterBlocks extends AbstractDiffable<ClusterBlocks> {
 
     private final Set<ClusterBlock> global;
 
-    private Map<String, Set<ClusterBlock>> indicesBlocks;
+    private final Map<String, Set<ClusterBlock>> indicesBlocks;
 
-    private EnumMap<ClusterBlockLevel, ImmutableLevelHolder> levelHolders;
+    private final EnumMap<ClusterBlockLevel, ImmutableLevelHolder> levelHolders;
 
     ClusterBlocks(Set<ClusterBlock> global, final Map<String, Set<ClusterBlock>> indicesBlocks) {
         this.global = global;
@@ -159,24 +159,6 @@ public class ClusterBlocks extends AbstractDiffable<ClusterBlocks> {
 
     public boolean hasIndexBlock(String index, ClusterBlock block) {
         return indicesBlocks.containsKey(index) && indicesBlocks.get(index).contains(block);
-    }
-
-    public void removeIndexBlock(String index, ClusterBlock block) {
-        Map<String, Set<ClusterBlock>> newIndicesBlocks = new HashMap<>(indicesBlocks); // copy to avoid UnsupportedOperationException>
-        for (Map.Entry<String, Set<ClusterBlock>> entry : indicesBlocks.entrySet()) {
-            String indexName = entry.getKey();
-            Set<ClusterBlock> clusterBlockSet = new HashSet<>(entry.getValue());
-            if (indexName.equals(index)) {
-                clusterBlockSet.remove(block);
-                if (clusterBlockSet.isEmpty()) {
-                    newIndicesBlocks.remove(indexName);
-                } else {
-                    newIndicesBlocks.put(indexName, Collections.unmodifiableSet(clusterBlockSet));
-                }
-            }
-        }
-        this.indicesBlocks = Collections.unmodifiableMap(newIndicesBlocks);
-        this.levelHolders = generateLevelHolders(global, indicesBlocks);
     }
 
     public boolean hasIndexBlockWithId(String index, int blockId) {

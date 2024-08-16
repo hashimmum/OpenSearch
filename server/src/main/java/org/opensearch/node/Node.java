@@ -1225,9 +1225,7 @@ public class Node implements Closeable {
             );
 
             final DiskThresholdMonitor diskThresholdMonitor = new DiskThresholdMonitor(
-                settings,
-                clusterService::state,
-                clusterService.getClusterSettings(),
+                clusterService,
                 client,
                 threadPool::relativeTimeInMillis,
                 rerouteService
