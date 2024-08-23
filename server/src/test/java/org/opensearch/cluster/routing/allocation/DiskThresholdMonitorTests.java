@@ -47,6 +47,9 @@ import org.opensearch.cluster.node.DiscoveryNodes;
 import org.opensearch.cluster.routing.RoutingNode;
 import org.opensearch.cluster.routing.RoutingTable;
 import org.opensearch.cluster.routing.ShardRoutingState;
+import org.opensearch.cluster.service.ClusterApplierService;
+import org.opensearch.cluster.service.ClusterManagerService;
+import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.Priority;
 import org.opensearch.common.settings.ClusterSettings;
 import org.opensearch.common.settings.Settings;
@@ -72,6 +75,8 @@ import java.util.function.LongSupplier;
 import static org.opensearch.cluster.routing.allocation.DiskThresholdSettings.CLUSTER_CREATE_INDEX_BLOCK_AUTO_RELEASE;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.equalTo;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 public class DiskThresholdMonitorTests extends OpenSearchAllocationTestCase {
 
@@ -116,9 +121,7 @@ public class DiskThresholdMonitorTests extends OpenSearchAllocationTestCase {
         AtomicReference<Set<String>> indices = new AtomicReference<>();
         AtomicLong currentTime = new AtomicLong();
         DiskThresholdMonitor monitor = new DiskThresholdMonitor(
-            Settings.EMPTY,
-            () -> clusterState,
-            new ClusterSettings(Settings.EMPTY, ClusterSettings.BUILT_IN_CLUSTER_SETTINGS),
+            createClusterService(Settings.EMPTY, clusterState),
             null,
             currentTime::get,
             (reason, priority, listener) -> {
@@ -178,9 +181,7 @@ public class DiskThresholdMonitorTests extends OpenSearchAllocationTestCase {
         assertTrue(anotherFinalClusterState.blocks().indexBlocked(ClusterBlockLevel.WRITE, "test_2"));
 
         monitor = new DiskThresholdMonitor(
-            Settings.EMPTY,
-            () -> anotherFinalClusterState,
-            new ClusterSettings(Settings.EMPTY, ClusterSettings.BUILT_IN_CLUSTER_SETTINGS),
+            createClusterService(Settings.EMPTY, anotherFinalClusterState),
             null,
             currentTime::get,
             (reason, priority, listener) -> {
@@ -219,9 +220,7 @@ public class DiskThresholdMonitorTests extends OpenSearchAllocationTestCase {
         AtomicLong currentTime = new AtomicLong();
         AtomicReference<ActionListener<ClusterState>> listenerReference = new AtomicReference<>();
         DiskThresholdMonitor monitor = new DiskThresholdMonitor(
-            Settings.EMPTY,
-            () -> clusterState,
-            new ClusterSettings(Settings.EMPTY, ClusterSettings.BUILT_IN_CLUSTER_SETTINGS),
+            createClusterService(Settings.EMPTY, clusterState),
             null,
             currentTime::get,
             (reason, priority, listener) -> {
@@ -360,9 +359,7 @@ public class DiskThresholdMonitorTests extends OpenSearchAllocationTestCase {
         );
 
         DiskThresholdMonitor monitor = new DiskThresholdMonitor(
-            Settings.EMPTY,
-            () -> clusterState,
-            new ClusterSettings(Settings.EMPTY, ClusterSettings.BUILT_IN_CLUSTER_SETTINGS),
+            createClusterService(Settings.EMPTY, clusterState),
             null,
             () -> 0L,
             (reason, priority, listener) -> {
@@ -422,9 +419,7 @@ public class DiskThresholdMonitorTests extends OpenSearchAllocationTestCase {
 
         assertTrue(clusterStateWithBlocks.blocks().indexBlocked(ClusterBlockLevel.WRITE, "test_2"));
         monitor = new DiskThresholdMonitor(
-            Settings.EMPTY,
-            () -> clusterStateWithBlocks,
-            new ClusterSettings(Settings.EMPTY, ClusterSettings.BUILT_IN_CLUSTER_SETTINGS),
+            createClusterService(Settings.EMPTY, clusterStateWithBlocks),
             null,
             () -> 0L,
             (reason, priority, listener) -> {
@@ -539,9 +534,7 @@ public class DiskThresholdMonitorTests extends OpenSearchAllocationTestCase {
         final AtomicLong relocatingShardSizeRef = new AtomicLong();
 
         DiskThresholdMonitor monitor = new DiskThresholdMonitor(
-            Settings.EMPTY,
-            clusterStateRef::get,
-            new ClusterSettings(Settings.EMPTY, ClusterSettings.BUILT_IN_CLUSTER_SETTINGS),
+            createClusterService(Settings.EMPTY, clusterState),
             null,
             timeSupplier,
             (reason, priority, listener) -> listener.onResponse(clusterStateRef.get())
@@ -687,9 +680,7 @@ public class DiskThresholdMonitorTests extends OpenSearchAllocationTestCase {
         AtomicLong currentTime = new AtomicLong();
         Settings settings = Settings.builder().build();
         DiskThresholdMonitor monitor = new DiskThresholdMonitor(
-            settings,
-            () -> clusterState,
-            new ClusterSettings(settings, ClusterSettings.BUILT_IN_CLUSTER_SETTINGS),
+            createClusterService(settings, clusterState),
             null,
             currentTime::get,
             (reason, priority, listener) -> {
@@ -766,9 +757,7 @@ public class DiskThresholdMonitorTests extends OpenSearchAllocationTestCase {
         AtomicLong currentTime = new AtomicLong();
         Settings settings = Settings.builder().put(CLUSTER_CREATE_INDEX_BLOCK_AUTO_RELEASE.getKey(), true).build();
         DiskThresholdMonitor monitor = new DiskThresholdMonitor(
-            settings,
-            () -> clusterState,
-            new ClusterSettings(settings, ClusterSettings.BUILT_IN_CLUSTER_SETTINGS),
+            createClusterService(settings, clusterState),
             null,
             currentTime::get,
             (reason, priority, listener) -> {
@@ -905,4 +894,10 @@ public class DiskThresholdMonitorTests extends OpenSearchAllocationTestCase {
         return new ClusterInfo(diskUsages, null, null, null, reservedSpace, Map.of());
     }
 
+    private static ClusterService createClusterService(Settings settings, ClusterState clusterState) {
+        ClusterSettings clusterSettings = new ClusterSettings(settings, ClusterSettings.BUILT_IN_CLUSTER_SETTINGS);
+        final ClusterApplierService clusterApplierService = mock(ClusterApplierService.class);
+        when(clusterApplierService.state()).thenReturn(clusterState);
+        return new ClusterService(settings, clusterSettings, mock(ClusterManagerService.class), clusterApplierService);
+    }
 }

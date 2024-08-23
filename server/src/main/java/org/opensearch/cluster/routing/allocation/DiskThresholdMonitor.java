@@ -39,8 +39,10 @@ import org.opensearch.action.support.GroupedActionListener;
 import org.opensearch.client.Client;
 import org.opensearch.cluster.ClusterInfo;
 import org.opensearch.cluster.ClusterState;
+import org.opensearch.cluster.ClusterStateUpdateTask;
 import org.opensearch.cluster.DiskUsage;
 import org.opensearch.cluster.block.ClusterBlockLevel;
+import org.opensearch.cluster.block.ClusterBlocks;
 import org.opensearch.cluster.metadata.IndexMetadata;
 import org.opensearch.cluster.metadata.Metadata;
 import org.opensearch.cluster.routing.RerouteService;
@@ -48,8 +50,8 @@ import org.opensearch.cluster.routing.RoutingNode;
 import org.opensearch.cluster.routing.RoutingNodes;
 import org.opensearch.cluster.routing.ShardRouting;
 import org.opensearch.cluster.routing.allocation.decider.DiskThresholdDecider;
+import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.Priority;
-import org.opensearch.common.settings.ClusterSettings;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.util.set.Sets;
 import org.opensearch.core.action.ActionListener;
@@ -80,6 +82,7 @@ public class DiskThresholdMonitor {
     private static final Logger logger = LogManager.getLogger(DiskThresholdMonitor.class);
     private final DiskThresholdSettings diskThresholdSettings;
     private final Client client;
+    private final ClusterService clusterService;
     private final Supplier<ClusterState> clusterStateSupplier;
     private final LongSupplier currentTimeMillisSupplier;
     private final RerouteService rerouteService;
@@ -105,17 +108,16 @@ public class DiskThresholdMonitor {
     private final Set<String> nodesOverHighThresholdAndRelocating = Sets.newConcurrentHashSet();
 
     public DiskThresholdMonitor(
-        Settings settings,
-        Supplier<ClusterState> clusterStateSupplier,
-        ClusterSettings clusterSettings,
+        ClusterService clusterService,
         Client client,
         LongSupplier currentTimeMillisSupplier,
         RerouteService rerouteService
     ) {
-        this.clusterStateSupplier = clusterStateSupplier;
+        this.clusterService = clusterService;
+        this.clusterStateSupplier = clusterService::state;
         this.currentTimeMillisSupplier = currentTimeMillisSupplier;
         this.rerouteService = rerouteService;
-        this.diskThresholdSettings = new DiskThresholdSettings(settings, clusterSettings);
+        this.diskThresholdSettings = new DiskThresholdSettings(clusterService.getSettings(), clusterService.getClusterSettings());
         this.client = client;
     }
 
@@ -156,6 +158,7 @@ public class DiskThresholdMonitor {
         final Set<String> indicesToMarkReadOnly = new HashSet<>();
         RoutingNodes routingNodes = state.getRoutingNodes();
         Set<String> indicesNotToAutoRelease = new HashSet<>();
+        final Set<String> indicesToRemoveReadOnly = new HashSet<>();
         markNodesMissingUsageIneligibleForRelease(routingNodes, usages, indicesNotToAutoRelease);
 
         final List<DiskUsage> usagesOverHighThreshold = new ArrayList<>();
@@ -253,6 +256,11 @@ public class DiskThresholdMonitor {
                     }
 
                 } else {
+                    if (routingNode != null) {
+                        for (ShardRouting routing : routingNode) {
+                            indicesToRemoveReadOnly.add(routing.getIndexName());
+                        }
+                    }
 
                     nodesOverHighThresholdAndRelocating.remove(node);
 
@@ -283,6 +291,29 @@ public class DiskThresholdMonitor {
                     }
 
                 }
+        }
+
+        // remove read-only blocks for indices.
+        if (!indicesToRemoveReadOnly.isEmpty()) {
+            clusterService.submitStateUpdateTask("disk-usage-recovered", new ClusterStateUpdateTask() {
+                @Override
+                public ClusterState execute(ClusterState currentState) {
+                    ClusterBlocks.Builder clusterBlocksBuilder = ClusterBlocks.builder().blocks(state.blocks());
+                    for (String index : indicesToRemoveReadOnly) {
+                        clusterBlocksBuilder.removeIndexBlock(index, IndexMetadata.INDEX_READ_ONLY_ALLOW_DELETE_BLOCK);
+                    }
+                    final Metadata metadata = Metadata.builder()
+                        .clusterUUID(state.metadata().clusterUUID())
+                        .coordinationMetadata(state.metadata().coordinationMetadata())
+                        .build();
+                    return ClusterState.builder(state).metadata(metadata).blocks(clusterBlocksBuilder.build()).build();
+                }
+
+                @Override
+                public void onFailure(String source, Exception e) {
+                    logger.error("failed to update cluster state for disk usage recovery task", e);
+                }
+            });
         }
 
         final ActionListener<Void> listener = new GroupedActionListener<>(ActionListener.wrap(this::checkFinished), 4);
