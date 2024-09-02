@@ -46,6 +46,7 @@ import org.opensearch.action.support.ActionFilters;
 import org.opensearch.action.support.GroupedActionListener;
 import org.opensearch.action.support.clustermanager.TransportClusterManagerNodeAction;
 import org.opensearch.cluster.ClusterChangedEvent;
+import org.opensearch.cluster.ClusterInfoService;
 import org.opensearch.cluster.ClusterState;
 import org.opensearch.cluster.ClusterStateApplier;
 import org.opensearch.cluster.ClusterStateTaskConfig;
@@ -159,6 +160,8 @@ public class SnapshotsService extends AbstractLifecycleComponent implements Clus
 
     private final RepositoriesService repositoriesService;
 
+    private final ClusterInfoService clusterInfoService;
+
     private final RemoteStoreLockManagerFactory remoteStoreLockManagerFactory;
 
     private final ThreadPool threadPool;
@@ -225,6 +228,7 @@ public class SnapshotsService extends AbstractLifecycleComponent implements Clus
         IndexNameExpressionResolver indexNameExpressionResolver,
         RepositoriesService repositoriesService,
         TransportService transportService,
+        ClusterInfoService clusterInfoService,
         ActionFilters actionFilters,
         @Nullable RemoteStorePinnedTimestampService remoteStorePinnedTimestampService
     ) {
@@ -234,6 +238,7 @@ public class SnapshotsService extends AbstractLifecycleComponent implements Clus
         this.remoteStoreLockManagerFactory = new RemoteStoreLockManagerFactory(() -> repositoriesService);
         this.threadPool = transportService.getThreadPool();
         this.transportService = transportService;
+        this.clusterInfoService = clusterInfoService;
         this.remoteStorePinnedTimestampService = remoteStorePinnedTimestampService;
 
         // The constructor of UpdateSnapshotStatusAction will register itself to the TransportService.
@@ -453,6 +458,7 @@ public class SnapshotsService extends AbstractLifecycleComponent implements Clus
      */
     public void createSnapshotV2(final CreateSnapshotRequest request, final ActionListener<SnapshotInfo> listener) {
         long pinnedTimestamp = System.currentTimeMillis();
+        long snapshotSizeInBytes = clusterInfoService.getClusterInfo().getPrimaryStoreSize();
         final String repositoryName = request.repository();
         final String snapshotName = indexNameExpressionResolver.resolveDateMathExpression(request.snapshot());
         validate(repositoryName, snapshotName);
@@ -519,7 +525,8 @@ public class SnapshotsService extends AbstractLifecycleComponent implements Clus
                     request.includeGlobalState(),
                     userMeta,
                     true,
-                    pinnedTimestamp
+                    pinnedTimestamp,
+                    snapshotSizeInBytes
                 );
                 if (!clusterService.state().nodes().isLocalNodeElectedClusterManager()) {
                     throw new SnapshotException(repositoryName, snapshotName, "Aborting snapshot-v2, no longer cluster manager");
@@ -1690,7 +1697,8 @@ public class SnapshotsService extends AbstractLifecycleComponent implements Clus
                 entry.includeGlobalState(),
                 entry.userMetadata(),
                 entry.remoteStoreIndexShallowCopy(),
-                0
+                0,
+                0L
             );
             final StepListener<Metadata> metadataListener = new StepListener<>();
             final Repository repo = repositoriesService.repository(snapshot.getRepository());
