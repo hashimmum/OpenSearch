@@ -190,9 +190,7 @@ public class RemoteStoreBaseIntegTestCase extends OpenSearchIntegTestCase {
         Settings.Builder settings = Settings.builder()
             .put("location", rmd.settings().get("location"))
             .put(REPOSITORIES_FAILRATE_SETTING.getKey(), value);
-        assertAcked(
-            client().admin().cluster().preparePutRepository(repoName).setType(ReloadableFsRepository.TYPE).setSettings(settings).get()
-        );
+        createRepository(repoName, ReloadableFsRepository.TYPE, settings);
     }
 
     public Settings indexSettings() {
@@ -313,7 +311,7 @@ public class RemoteStoreBaseIntegTestCase extends OpenSearchIntegTestCase {
         }
     }
 
-    public static int getFileCount(Path path) throws Exception {
+    public static int getFileCount(Path path) throws IOException {
         final AtomicInteger filesExisting = new AtomicInteger(0);
         Files.walkFileTree(path, new SimpleFileVisitor<>() {
             @Override
