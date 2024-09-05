@@ -2013,7 +2013,8 @@ public class SnapshotResiliencyTests extends OpenSearchTestCase {
                     repositoriesService,
                     transportService,
                     actionFilters,
-                    null
+                    null,
+                    DefaultRemoteStoreSettings.INSTANCE
                 );
                 nodeEnv = new NodeEnvironment(settings, environment);
                 final NamedXContentRegistry namedXContentRegistry = new NamedXContentRegistry(Collections.emptyList());
@@ -2070,7 +2071,7 @@ public class SnapshotResiliencyTests extends OpenSearchTestCase {
                     emptyMap(),
                     null,
                     emptyMap(),
-                    new RemoteSegmentStoreDirectoryFactory(() -> repositoriesService, threadPool),
+                    new RemoteSegmentStoreDirectoryFactory(() -> repositoriesService, threadPool, ""),
                     repositoriesServiceReference::get,
                     null,
                     new RemoteStoreStatsTrackerFactory(clusterService, settings),
@@ -2284,7 +2285,8 @@ public class SnapshotResiliencyTests extends OpenSearchTestCase {
                     responseCollectorService,
                     new NoneCircuitBreakerService(),
                     null,
-                    new TaskResourceTrackingService(settings, clusterSettings, threadPool)
+                    new TaskResourceTrackingService(settings, clusterSettings, threadPool),
+                    Collections.emptyList()
                 );
                 SearchPhaseController searchPhaseController = new SearchPhaseController(
                     writableRegistry(),
@@ -2366,7 +2368,8 @@ public class SnapshotResiliencyTests extends OpenSearchTestCase {
                         snapshotsService,
                         threadPool,
                         actionFilters,
-                        indexNameExpressionResolver
+                        indexNameExpressionResolver,
+                        DefaultRemoteStoreSettings.INSTANCE
                     )
                 );
                 actions.put(
