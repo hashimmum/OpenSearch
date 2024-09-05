@@ -77,12 +77,14 @@ import org.opensearch.core.indices.breaker.CircuitBreakerService;
 import org.opensearch.index.IndexNotFoundException;
 import org.opensearch.index.IndexService;
 import org.opensearch.index.IndexSettings;
+import org.opensearch.index.compositeindex.datacube.startree.utils.StarTreeQueryHelper;
 import org.opensearch.index.engine.Engine;
 import org.opensearch.index.mapper.DerivedFieldResolver;
 import org.opensearch.index.mapper.DerivedFieldResolverFactory;
 import org.opensearch.index.query.InnerHitContextBuilder;
 import org.opensearch.index.query.MatchAllQueryBuilder;
 import org.opensearch.index.query.MatchNoneQueryBuilder;
+import org.opensearch.index.query.ParsedQuery;
 import org.opensearch.index.query.QueryBuilder;
 import org.opensearch.index.query.QueryRewriteContext;
 import org.opensearch.index.query.QueryShardContext;
@@ -137,6 +139,7 @@ import org.opensearch.search.sort.MinAndMax;
 import org.opensearch.search.sort.SortAndFormats;
 import org.opensearch.search.sort.SortBuilder;
 import org.opensearch.search.sort.SortOrder;
+import org.opensearch.search.startree.OriginalOrStarTreeQuery;
 import org.opensearch.search.suggest.Suggest;
 import org.opensearch.search.suggest.completion.CompletionSuggestion;
 import org.opensearch.tasks.TaskResourceTrackingService;
@@ -164,6 +167,7 @@ import java.util.function.LongSupplier;
 import static org.opensearch.common.unit.TimeValue.timeValueHours;
 import static org.opensearch.common.unit.TimeValue.timeValueMillis;
 import static org.opensearch.common.unit.TimeValue.timeValueMinutes;
+import static org.opensearch.search.internal.SearchContext.TRACK_TOTAL_HITS_DISABLED;
 
 /**
  * The main search service
@@ -1357,6 +1361,7 @@ public class SearchService extends AbstractLifecycleComponent implements IndexEv
             context.evaluateRequestShouldUseConcurrentSearch();
             return;
         }
+
         SearchShardTarget shardTarget = context.shardTarget();
         QueryShardContext queryShardContext = context.getQueryShardContext();
         context.from(source.from());
@@ -1370,7 +1375,7 @@ public class SearchService extends AbstractLifecycleComponent implements IndexEv
             InnerHitContextBuilder.extractInnerHits(source.postFilter(), innerHitBuilders);
             context.parsedPostFilter(queryShardContext.toQuery(source.postFilter()));
         }
-        if (innerHitBuilders.size() > 0) {
+        if (!innerHitBuilders.isEmpty()) {
             for (Map.Entry<String, InnerHitContextBuilder> entry : innerHitBuilders.entrySet()) {
                 try {
                     entry.getValue().build(context, context.innerHits());
@@ -1382,9 +1387,7 @@ public class SearchService extends AbstractLifecycleComponent implements IndexEv
         if (source.sorts() != null) {
             try {
                 Optional<SortAndFormats> optionalSort = SortBuilder.buildSort(source.sorts(), context.getQueryShardContext());
-                if (optionalSort.isPresent()) {
-                    context.sort(optionalSort.get());
-                }
+                optionalSort.ifPresent(context::sort);
             } catch (IOException e) {
                 throw new SearchException(shardTarget, "failed to create sort elements", e);
             }
@@ -1538,6 +1541,20 @@ public class SearchService extends AbstractLifecycleComponent implements IndexEv
         context.evaluateRequestShouldUseConcurrentSearch();
         if (source.profile()) {
             context.setProfilers(new Profilers(context.searcher(), context.shouldUseConcurrentSearch()));
+        }
+
+        if (this.indicesService.getCompositeIndexSettings() != null
+            && this.indicesService.getCompositeIndexSettings().isStarTreeIndexCreationEnabled()
+            && StarTreeQueryHelper.isStarTreeSupported(context, source.trackTotalHitsUpTo() != null)) {
+            try {
+                OriginalOrStarTreeQuery parsedQuery = StarTreeQueryHelper.getOriginalOrStarTreeQuery(context, source);
+                if (parsedQuery != null) {
+                    context.parsedQuery(new ParsedQuery(parsedQuery));
+                    logger.debug("can use star tree");
+                } else {
+                    logger.debug("cannot use star tree");
+                }
+            } catch (IOException ignored) {}
         }
     }
 
@@ -1698,7 +1715,7 @@ public class SearchService extends AbstractLifecycleComponent implements IndexEv
             && minMax != null
             && primarySortField != null
             && primarySortField.missing() == null
-            && Objects.equals(trackTotalHitsUpto, SearchContext.TRACK_TOTAL_HITS_DISABLED)) {
+            && Objects.equals(trackTotalHitsUpto, TRACK_TOTAL_HITS_DISABLED)) {
             final Object searchAfterPrimary = searchAfter.fields[0];
             if (primarySortField.order() == SortOrder.DESC) {
                 if (minMax.compareMin(searchAfterPrimary) > 0) {

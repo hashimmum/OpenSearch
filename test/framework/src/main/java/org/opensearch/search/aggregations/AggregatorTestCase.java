@@ -651,6 +651,75 @@ public abstract class AggregatorTestCase extends OpenSearchTestCase {
         return internalAgg;
     }
 
+    protected <A extends InternalAggregation, C extends Aggregator> A searchAndReduceStarTree(
+        IndexSettings indexSettings,
+        IndexSearcher searcher,
+        Query query,
+        AggregationBuilder builder,
+        int maxBucket,
+        boolean hasNested,
+        MappedFieldType... fieldTypes
+    ) throws IOException {
+        query = query.rewrite(searcher);
+        final IndexReaderContext ctx = searcher.getTopReaderContext();
+        final PipelineTree pipelines = builder.buildPipelineTree();
+        List<InternalAggregation> aggs = new ArrayList<>();
+        if (hasNested) {
+            query = Queries.filtered(query, Queries.newNonNestedFilter());
+        }
+
+        MultiBucketConsumer bucketConsumer = new MultiBucketConsumer(
+            maxBucket,
+            new NoneCircuitBreakerService().getBreaker(CircuitBreaker.REQUEST)
+        );
+        C root = createAggregator(query, builder, searcher, bucketConsumer, fieldTypes);
+
+        if (randomBoolean() && searcher.getIndexReader().leaves().size() > 0) {
+            assertTrue(ctx instanceof LeafReaderContext);
+            final LeafReaderContext compCTX = (LeafReaderContext) ctx;
+            final int size = compCTX.leaves().size();
+            final ShardSearcher[] subSearchers = new ShardSearcher[size];
+            for (int searcherIDX = 0; searcherIDX < subSearchers.length; searcherIDX++) {
+                final LeafReaderContext leave = compCTX.leaves().get(searcherIDX);
+                subSearchers[searcherIDX] = new ShardSearcher(leave, compCTX);
+            }
+            for (ShardSearcher subSearcher : subSearchers) {
+                MultiBucketConsumer shardBucketConsumer = new MultiBucketConsumer(
+                    maxBucket,
+                    new NoneCircuitBreakerService().getBreaker(CircuitBreaker.REQUEST)
+                );
+                C a = createAggregator(query, builder, subSearcher, indexSettings, shardBucketConsumer, fieldTypes);
+                a.preCollection();
+                Weight weight = subSearcher.createWeight(query, ScoreMode.COMPLETE, 1f);
+
+                subSearcher.search(weight, a);
+                a.postCollection();
+                aggs.add(a.buildTopLevel());
+            }
+        } else {
+            root.preCollection();
+            searcher.search(query, root);
+            root.postCollection();
+            aggs.add(root.buildTopLevel());
+        }
+
+        MultiBucketConsumer reduceBucketConsumer = new MultiBucketConsumer(
+            maxBucket,
+            new NoneCircuitBreakerService().getBreaker(CircuitBreaker.REQUEST)
+        );
+        InternalAggregation.ReduceContext context = InternalAggregation.ReduceContext.forFinalReduction(
+            root.context().bigArrays(),
+            getMockScriptService(),
+            reduceBucketConsumer,
+            pipelines
+        );
+
+        @SuppressWarnings("unchecked")
+        A internalAgg = (A) aggs.get(0).reduce(aggs, context);
+        doAssertReducedMultiBucketConsumer(internalAgg, reduceBucketConsumer);
+        return internalAgg;
+    }
+
     protected void doAssertReducedMultiBucketConsumer(Aggregation agg, MultiBucketConsumerService.MultiBucketConsumer bucketConsumer) {
         InternalAggregationTestCase.assertMultiBucketConsumer(agg, bucketConsumer);
     }
