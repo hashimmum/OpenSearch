@@ -8,7 +8,9 @@
 
 package org.opensearch.wlm;
 
+import org.opensearch.common.inject.Inject;
 import org.opensearch.core.concurrency.OpenSearchRejectedExecutionException;
+import org.opensearch.transport.TransportService;
 import org.opensearch.wlm.stats.QueryGroupState;
 import org.opensearch.wlm.stats.QueryGroupStats;
 import org.opensearch.wlm.stats.QueryGroupStats.QueryGroupStatsHolder;
@@ -18,17 +20,22 @@ import java.util.Map;
 
 /**
  * As of now this is a stub and main implementation PR will be raised soon.Coming PR will collate these changes with core QueryGroupService changes
+ * @opensearch.experimental
  */
 public class QueryGroupService {
     // This map does not need to be concurrent since we will process the cluster state change serially and update
     // this map with new additions and deletions of entries. QueryGroupState is thread safe
     private final Map<String, QueryGroupState> queryGroupStateMap;
+    private final TransportService transportService;
 
-    public QueryGroupService() {
-        this(new HashMap<>());
+    @Inject
+    public QueryGroupService(TransportService transportService) {
+        this(transportService, new HashMap<>());
     }
 
-    public QueryGroupService(Map<String, QueryGroupState> queryGroupStateMap) {
+    @Inject
+    public QueryGroupService(TransportService transportService, Map<String, QueryGroupState> queryGroupStateMap) {
+        this.transportService = transportService;
         this.queryGroupStateMap = queryGroupStateMap;
     }
 
@@ -59,7 +66,7 @@ public class QueryGroupService {
             statsHolderMap.put(queryGroupId, QueryGroupStatsHolder.from(currentState));
         }
 
-        return new QueryGroupStats(statsHolderMap);
+        return new QueryGroupStats(transportService.getLocalNode(), statsHolderMap);
     }
 
     /**
