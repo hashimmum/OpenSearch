@@ -89,7 +89,7 @@ public class QueryGroupService {
             .anyMatch(
                 entry -> entry.getValue().getLastRecordedUsage() > queryGroup.getMutableQueryGroupFragment()
                     .getResourceLimits()
-                    .get(entry.getKey())
+                    .getOrDefault(entry.getKey(), 0.0)
             );
     }
 
