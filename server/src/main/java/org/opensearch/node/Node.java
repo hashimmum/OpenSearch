@@ -1134,9 +1134,13 @@ public class Node implements Closeable {
                 taskHeaders,
                 tracer
             );
-            final QueryGroupService queryGroupService = new QueryGroupService(transportService); // We will need to replace this with actual
-                                                                                                 // instance of the
-                                                                                                 // queryGroupService
+            final QueryGroupService queryGroupService = new QueryGroupService(transportService.getLocalNode(), clusterService); // We will
+                                                                                                                                // need to
+                                                                                                                                // replace
+                                                                                                                                // this with
+                                                                                                                                // actual
+            // instance of the
+            // queryGroupService
             queryGroupServiceSetOnce.set(queryGroupService);
 
             final QueryGroupRequestOperationListener queryGroupRequestOperationListener = new QueryGroupRequestOperationListener(
