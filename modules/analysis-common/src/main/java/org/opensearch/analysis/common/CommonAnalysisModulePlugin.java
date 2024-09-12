@@ -205,6 +205,14 @@ public class CommonAnalysisModulePlugin extends Plugin implements AnalysisPlugin
         analyzers.put("fingerprint", FingerprintAnalyzerProvider::new);
         analyzers.put("pattern", PatternAnalyzerProvider::new);
         analyzers.put("snowball", SnowballAnalyzerProvider::new);
+        analyzers.put(
+            "phone",
+            (indexSettings, environment, name, settings) -> new PhoneNumberAnalyzerProvider(indexSettings, "phone", settings, true)
+        );
+        analyzers.put(
+            "phone-search",
+            (indexSettings, environment, name, settings) -> new PhoneNumberAnalyzerProvider(indexSettings, "phone-search", settings, false)
+        );
 
         // Language analyzers:
         analyzers.put("arabic", ArabicAnalyzerProvider::new);
@@ -411,6 +419,20 @@ public class CommonAnalysisModulePlugin extends Plugin implements AnalysisPlugin
         tokenizers.put("uax_url_email", UAX29URLEmailTokenizerFactory::new);
         tokenizers.put("whitespace", WhitespaceTokenizerFactory::new);
         tokenizers.put("keyword", KeywordTokenizerFactory::new);
+        tokenizers.put(
+            "phone",
+            (indexSettings, environment, name, settings) -> new PhoneNumberTermTokenizerFactory(indexSettings, "phone", settings, true)
+        );
+        tokenizers.put(
+            "phone-search",
+            (indexSettings, environment, name, settings) -> new PhoneNumberTermTokenizerFactory(
+                indexSettings,
+                "phone-search",
+                settings,
+                false
+            )
+        );
+
         return tokenizers;
     }
 

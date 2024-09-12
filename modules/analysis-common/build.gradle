@@ -44,4 +44,6 @@ restResources {
 
 dependencies {
   compileOnly project(':modules:lang-painless')
+
+  implementation group: 'com.googlecode.libphonenumber', name: 'libphonenumber', version: '8.13.45'
 }
