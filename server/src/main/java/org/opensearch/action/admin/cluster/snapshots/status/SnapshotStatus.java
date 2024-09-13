@@ -32,6 +32,7 @@
 
 package org.opensearch.action.admin.cluster.snapshots.status;
 
+import org.opensearch.Version;
 import org.opensearch.cluster.SnapshotsInProgress;
 import org.opensearch.cluster.SnapshotsInProgress.State;
 import org.opensearch.common.Nullable;
@@ -86,6 +87,8 @@ public class SnapshotStatus implements ToXContentObject, Writeable {
 
     private SnapshotStats stats;
 
+    private final long initialTotalSizeInBytes;
+
     @Nullable
     private final Boolean includeGlobalState;
 
@@ -96,7 +99,12 @@ public class SnapshotStatus implements ToXContentObject, Writeable {
         includeGlobalState = in.readOptionalBoolean();
         final long startTime = in.readLong();
         final long time = in.readLong();
-        updateShardStats(startTime, time);
+        if (in.getVersion().onOrAfter(Version.CURRENT)) {
+            initialTotalSizeInBytes = in.readOptionalLong();
+        } else {
+            initialTotalSizeInBytes = 0L;
+        }
+        updateShardStats(startTime, time, initialTotalSizeInBytes);
     }
 
     SnapshotStatus(
@@ -105,7 +113,8 @@ public class SnapshotStatus implements ToXContentObject, Writeable {
         List<SnapshotIndexShardStatus> shards,
         Boolean includeGlobalState,
         long startTime,
-        long time
+        long time,
+        long initialTotalSizeInBytes
     ) {
         this.snapshot = Objects.requireNonNull(snapshot);
         this.state = Objects.requireNonNull(state);
@@ -113,7 +122,9 @@ public class SnapshotStatus implements ToXContentObject, Writeable {
         this.includeGlobalState = includeGlobalState;
         shardsStats = new SnapshotShardsStats(shards);
         assert time >= 0 : "time must be >= 0 but received [" + time + "]";
-        updateShardStats(startTime, time);
+        this.initialTotalSizeInBytes = initialTotalSizeInBytes;
+        assert initialTotalSizeInBytes >= 0 : "initialTotalSizeInBytes must be >= 0 but received [" + initialTotalSizeInBytes + "]";
+        updateShardStats(startTime, time, initialTotalSizeInBytes);
     }
 
     private SnapshotStatus(
@@ -123,7 +134,8 @@ public class SnapshotStatus implements ToXContentObject, Writeable {
         Map<String, SnapshotIndexStatus> indicesStatus,
         SnapshotShardsStats shardsStats,
         SnapshotStats stats,
-        Boolean includeGlobalState
+        Boolean includeGlobalState,
+        long initialTotalSizeInBytes
     ) {
         this.snapshot = snapshot;
         this.state = state;
@@ -132,6 +144,7 @@ public class SnapshotStatus implements ToXContentObject, Writeable {
         this.shardsStats = shardsStats;
         this.stats = stats;
         this.includeGlobalState = includeGlobalState;
+        this.initialTotalSizeInBytes = initialTotalSizeInBytes;
     }
 
     /**
@@ -204,6 +217,9 @@ public class SnapshotStatus implements ToXContentObject, Writeable {
         out.writeOptionalBoolean(includeGlobalState);
         out.writeLong(stats.getStartTime());
         out.writeLong(stats.getTime());
+        if (out.getVersion().onOrAfter(Version.CURRENT)) {
+            out.writeOptionalLong(initialTotalSizeInBytes);
+        }
     }
 
     @Override
@@ -276,7 +292,7 @@ public class SnapshotStatus implements ToXContentObject, Writeable {
                     shards.addAll(index.getShards().values());
                 }
             }
-            return new SnapshotStatus(snapshot, state, shards, indicesStatus, shardsStats, stats, includeGlobalState);
+            return new SnapshotStatus(snapshot, state, shards, indicesStatus, shardsStats, stats, includeGlobalState, 0L);
         }
     );
     static {
@@ -299,8 +315,8 @@ public class SnapshotStatus implements ToXContentObject, Writeable {
         return PARSER.parse(parser, null);
     }
 
-    private void updateShardStats(long startTime, long time) {
-        stats = new SnapshotStats(startTime, time, 0, 0, 0, 0, 0, 0);
+    private void updateShardStats(long startTime, long time, long initialTotalSizeInBytes) {
+        stats = new SnapshotStats(startTime, time, 0, 0, 0, 0, initialTotalSizeInBytes, 0);
         shardsStats = new SnapshotShardsStats(shards);
         for (SnapshotIndexShardStatus shard : shards) {
             // BWC: only update timestamps when we did not get a start time from an old node
