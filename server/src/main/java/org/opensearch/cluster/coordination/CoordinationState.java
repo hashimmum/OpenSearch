@@ -38,6 +38,7 @@ import org.opensearch.cluster.coordination.CoordinationMetadata.VotingConfigurat
 import org.opensearch.cluster.coordination.PersistedStateRegistry.PersistedStateType;
 import org.opensearch.cluster.metadata.Metadata;
 import org.opensearch.cluster.node.DiscoveryNode;
+import org.opensearch.common.settings.ClusterSettings;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.util.io.IOUtils;
 import org.opensearch.gateway.remote.ClusterMetadataManifest;
@@ -54,6 +55,7 @@ import java.util.Set;
 
 import static org.opensearch.cluster.coordination.Coordinator.ZEN1_BWC_TERM;
 import static org.opensearch.gateway.remote.RemoteClusterStateService.REMOTE_PUBLICATION_SETTING;
+import static org.opensearch.node.remotestore.RemoteStoreNodeAttribute.isRemoteRoutingTableEnabled;
 import static org.opensearch.node.remotestore.RemoteStoreNodeAttribute.isRemoteStoreClusterStateEnabled;
 
 /**
@@ -87,8 +89,8 @@ public class CoordinationState {
         DiscoveryNode localNode,
         PersistedStateRegistry persistedStateRegistry,
         ElectionStrategy electionStrategy,
-        Settings settings
-    ) {
+        Settings settings,
+        ClusterSettings clusterSettings) {
         this.localNode = localNode;
 
         // persisted state registry
@@ -105,10 +107,10 @@ public class CoordinationState {
             .getLastAcceptedConfiguration();
         this.publishVotes = new VoteCollection();
         this.isRemoteStateEnabled = isRemoteStoreClusterStateEnabled(settings);
-        // ToDo: revisit this check while making the setting dynamic
         this.isRemotePublicationEnabled = isRemoteStateEnabled
             && REMOTE_PUBLICATION_SETTING.get(settings)
-            && localNode.isRemoteStatePublicationEnabled();
+            && localNode.isRemoteStatePublicationConfigured();
+        clusterSettings.addSettingsUpdateConsumer(REMOTE_PUBLICATION_SETTING, this::setRemotePublicationSetting);
     }
 
     public boolean isRemotePublicationEnabled() {
@@ -649,6 +651,15 @@ public class CoordinationState {
                 .isLocalNodeElectedClusterManager() == false
             && persistedStateRegistry.getPersistedState(PersistedStateType.REMOTE).getLastAcceptedState() != null
             && persistedStateRegistry.getPersistedState(PersistedStateType.REMOTE).getLastAcceptedManifest() != null;
+    }
+
+    private void setRemotePublicationSetting(boolean remotePublicationSetting) {
+        if (remotePublicationSetting == false) {
+            this.isRemotePublicationEnabled = false;
+        } else {
+            this.isRemotePublicationEnabled = isRemoteStateEnabled && localNode.isRemoteStatePublicationConfigured();
+        }
+
     }
 
     /**
