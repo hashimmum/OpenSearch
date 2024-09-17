@@ -862,7 +862,9 @@ public class Coordinator extends AbstractLifecycleComponent implements Discovery
     @Override
     protected void doStart() {
         synchronized (mutex) {
-            coordinationState.set(new CoordinationState(getLocalNode(), persistedStateRegistry, electionStrategy, settings, clusterSettings));
+            coordinationState.set(
+                new CoordinationState(getLocalNode(), persistedStateRegistry, electionStrategy, settings, clusterSettings)
+            );
             peerFinder.setCurrentTerm(getCurrentTerm());
             configuredHostsResolver.start();
             final ClusterState lastAcceptedState = coordinationState.get().getLastAcceptedState();

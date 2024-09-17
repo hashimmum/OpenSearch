@@ -55,7 +55,6 @@ import java.util.Set;
 
 import static org.opensearch.cluster.coordination.Coordinator.ZEN1_BWC_TERM;
 import static org.opensearch.gateway.remote.RemoteClusterStateService.REMOTE_PUBLICATION_SETTING;
-import static org.opensearch.node.remotestore.RemoteStoreNodeAttribute.isRemoteRoutingTableEnabled;
 import static org.opensearch.node.remotestore.RemoteStoreNodeAttribute.isRemoteStoreClusterStateEnabled;
 
 /**
@@ -90,7 +89,8 @@ public class CoordinationState {
         PersistedStateRegistry persistedStateRegistry,
         ElectionStrategy electionStrategy,
         Settings settings,
-        ClusterSettings clusterSettings) {
+        ClusterSettings clusterSettings
+    ) {
         this.localNode = localNode;
 
         // persisted state registry
