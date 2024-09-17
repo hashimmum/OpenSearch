@@ -36,6 +36,8 @@ import org.opensearch.action.support.nodes.NodesOperationRequestBuilder;
 import org.opensearch.client.OpenSearchClient;
 import org.opensearch.common.annotation.PublicApi;
 
+import java.util.Set;
+
 /**
  * Transport request builder for obtaining cluster stats
  *
@@ -53,6 +55,12 @@ public class ClusterStatsRequestBuilder extends NodesOperationRequestBuilder<
 
     public final ClusterStatsRequestBuilder useAggregatedNodeLevelResponses(boolean useAggregatedNodeLevelResponses) {
         request.useAggregatedNodeLevelResponses(useAggregatedNodeLevelResponses);
+        return this;
+    }
+
+    public final ClusterStatsRequestBuilder requestMetrics(Set<String> requestMetrics) {
+        request.clearMetrics();
+        requestMetrics.forEach(request::addMetric);
         return this;
     }
 }

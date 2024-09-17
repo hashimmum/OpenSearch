@@ -33,6 +33,7 @@
 package org.opensearch.action.admin.cluster.stats;
 
 import org.opensearch.action.FailedNodeException;
+import org.opensearch.action.admin.cluster.stats.ClusterStatsRequest.Metric;
 import org.opensearch.action.support.nodes.BaseNodesResponse;
 import org.opensearch.cluster.ClusterName;
 import org.opensearch.cluster.ClusterState;
@@ -47,6 +48,7 @@ import org.opensearch.core.xcontent.XContentBuilder;
 import java.io.IOException;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 /**
  * Transport response for obtaining cluster stats
@@ -89,11 +91,31 @@ public class ClusterStatsResponse extends BaseNodesResponse<ClusterStatsNodeResp
         List<FailedNodeException> failures,
         ClusterState state
     ) {
+        this(timestamp, clusterUUID, clusterName, nodes, failures, state, ClusterStatsRequest.SubMetrics.allSubMetrics());
+    }
+
+    public ClusterStatsResponse(
+        long timestamp,
+        String clusterUUID,
+        ClusterName clusterName,
+        List<ClusterStatsNodeResponse> nodes,
+        List<FailedNodeException> failures,
+        ClusterState state,
+        Set<String> requestedMetrics
+    ) {
         super(clusterName, nodes, failures);
         this.clusterUUID = clusterUUID;
         this.timestamp = timestamp;
-        nodesStats = new ClusterStatsNodes(nodes);
-        indicesStats = new ClusterStatsIndices(nodes, MappingStats.of(state), AnalysisStats.of(state));
+        MappingStats mappingStats = ClusterStatsRequest.SubMetrics.MAPPINGS.containedIn(requestedMetrics) ? MappingStats.of(state) : null;
+        AnalysisStats analysisStats = ClusterStatsRequest.SubMetrics.ANALYSIS.containedIn(requestedMetrics)
+            ? AnalysisStats.of(state)
+            : null;
+        nodesStats = ClusterStatsRequest.SubMetrics.containsMetricType(requestedMetrics, Metric.NODES)
+            ? new ClusterStatsNodes(requestedMetrics, nodes)
+            : null;
+        indicesStats = ClusterStatsRequest.SubMetrics.containsMetricType(requestedMetrics, Metric.INDICES)
+            ? new ClusterStatsIndices(requestedMetrics, nodes, mappingStats, analysisStats)
+            : null;
         ClusterHealthStatus status = null;
         for (ClusterStatsNodeResponse response : nodes) {
             // only the cluster-manager node populates the status
@@ -131,8 +153,13 @@ public class ClusterStatsResponse extends BaseNodesResponse<ClusterStatsNodeResp
         out.writeVLong(timestamp);
         out.writeOptionalWriteable(status);
         out.writeOptionalString(clusterUUID);
-        out.writeOptionalWriteable(indicesStats.getMappings());
-        out.writeOptionalWriteable(indicesStats.getAnalysis());
+        if (indicesStats != null) {
+            out.writeOptionalWriteable(indicesStats.getMappings());
+            out.writeOptionalWriteable(indicesStats.getAnalysis());
+        } else {
+            out.writeOptionalWriteable(null);
+            out.writeOptionalWriteable(null);
+        }
     }
 
     @Override
@@ -153,12 +180,16 @@ public class ClusterStatsResponse extends BaseNodesResponse<ClusterStatsNodeResp
         if (status != null) {
             builder.field("status", status.name().toLowerCase(Locale.ROOT));
         }
-        builder.startObject("indices");
-        indicesStats.toXContent(builder, params);
-        builder.endObject();
-        builder.startObject("nodes");
-        nodesStats.toXContent(builder, params);
-        builder.endObject();
+        if (indicesStats != null) {
+            builder.startObject("indices");
+            indicesStats.toXContent(builder, params);
+            builder.endObject();
+        }
+        if (nodesStats != null) {
+            builder.startObject("nodes");
+            nodesStats.toXContent(builder, params);
+            builder.endObject();
+        }
         return builder;
     }
 
