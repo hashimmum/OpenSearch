@@ -75,6 +75,7 @@ public class RemoteIndexMetadataManagerTests extends OpenSearchTestCase {
         when(blobStoreRepository.getCompressor()).thenReturn(compressor);
         remoteIndexMetadataManager = new RemoteIndexMetadataManager(
             clusterSettings,
+            new RemoteClusterStateSettings(Settings.EMPTY, new ClusterSettings(Settings.EMPTY, ClusterSettings.BUILT_IN_CLUSTER_SETTINGS)),
             "test-cluster",
             blobStoreRepository,
             blobStoreTransferService,

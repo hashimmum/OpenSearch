@@ -128,6 +128,7 @@ public class RemoteGlobalMetadataManagerTests extends OpenSearchTestCase {
         when(blobStoreRepository.basePath()).thenReturn(blobPath);
         remoteGlobalMetadataManager = new RemoteGlobalMetadataManager(
             clusterSettings,
+            new RemoteClusterStateSettings(Settings.EMPTY, new ClusterSettings(Settings.EMPTY, ClusterSettings.BUILT_IN_CLUSTER_SETTINGS)),
             CLUSTER_NAME,
             blobStoreRepository,
             blobStoreTransferService,

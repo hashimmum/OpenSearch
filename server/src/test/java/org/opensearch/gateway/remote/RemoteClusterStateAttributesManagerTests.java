@@ -93,6 +93,7 @@ public class RemoteClusterStateAttributesManagerTests extends OpenSearchTestCase
         compressor = new NoneCompressor();
 
         remoteClusterStateAttributesManager = new RemoteClusterStateAttributesManager(
+            new RemoteClusterStateSettings(Settings.EMPTY, new ClusterSettings(Settings.EMPTY, ClusterSettings.BUILT_IN_CLUSTER_SETTINGS)),
             CLUSTER_NAME,
             blobStoreRepository,
             blobStoreTransferService,
