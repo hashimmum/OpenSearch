@@ -2259,4 +2259,18 @@ public class SearchServiceTests extends OpenSearchSingleNodeTestCase {
         primarySort.order(SortOrder.DESC);
         assertEquals(SearchService.canMatchSearchAfter(searchAfter, minMax, primarySort, 1000), true);
     }
+
+    /**
+     * Test canMatchSearchAfter with null value, even if min/max is out of range
+     * Min = 0L, Max = 9L, search_after = null
+     * Expected result is canMatch = true
+     */
+    public void testCanMatchSearchAfterWithNullValue() throws IOException {
+        FieldDoc searchAfter = new FieldDoc(0, 0, new Long[] { null });
+        MinAndMax<?> minMax = new MinAndMax<Long>(0L, 9L);
+        FieldSortBuilder primarySort = new FieldSortBuilder("test");
+        primarySort.order(SortOrder.DESC);
+        // Should be true with null value
+        assertEquals(SearchService.canMatchSearchAfter(searchAfter, minMax, primarySort, SearchContext.TRACK_TOTAL_HITS_DISABLED), true);
+    }
 }

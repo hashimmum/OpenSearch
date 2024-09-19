@@ -1700,6 +1700,9 @@ public class SearchService extends AbstractLifecycleComponent implements IndexEv
             && primarySortField.missing() == null
             && Objects.equals(trackTotalHitsUpto, SearchContext.TRACK_TOTAL_HITS_DISABLED)) {
             final Object searchAfterPrimary = searchAfter.fields[0];
+            if (searchAfterPrimary == null) {
+                return true;
+            }
             if (primarySortField.order() == SortOrder.DESC) {
                 if (minMax.compareMin(searchAfterPrimary) > 0) {
                     // In Desc order, if segment/shard minimum is gt search_after, the segment/shard won't be competitive
