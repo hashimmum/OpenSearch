@@ -14,6 +14,7 @@ import org.opensearch.ExceptionsHelper;
 import org.opensearch.OpenSearchTimeoutException;
 import org.opensearch.action.FailedNodeException;
 import org.opensearch.action.support.nodes.BaseNodeResponse;
+import org.opensearch.cluster.ClusterManagerMetrics;
 import org.opensearch.cluster.node.DiscoveryNode;
 import org.opensearch.cluster.node.DiscoveryNodes;
 import org.opensearch.core.concurrency.OpenSearchRejectedExecutionException;
@@ -51,10 +52,12 @@ public abstract class AsyncShardFetchCache<K extends BaseNodeResponse> {
 
     private final Logger logger;
     private final String type;
+    private final ClusterManagerMetrics clusterManagerMetrics;
 
-    protected AsyncShardFetchCache(Logger logger, String type) {
+    protected AsyncShardFetchCache(Logger logger, String type, ClusterManagerMetrics clusterManagerMetrics) {
         this.logger = logger;
         this.type = type;
+        this.clusterManagerMetrics = clusterManagerMetrics;
     }
 
     abstract void initData(DiscoveryNode node);
@@ -164,6 +167,7 @@ public abstract class AsyncShardFetchCache<K extends BaseNodeResponse> {
     void processResponses(List<K> responses, long fetchingRound) {
         for (K response : responses) {
             BaseNodeEntry nodeEntry = getCache().get(response.getNode().getId());
+            clusterManagerMetrics.incrementCounter(clusterManagerMetrics.asyncFetchTotalCounter, 1.0);
             if (nodeEntry != null) {
                 if (validateNodeResponse(nodeEntry, fetchingRound)) {
                     // if the entry is there, for the right fetching round and not marked as failed already, process it
@@ -193,6 +197,8 @@ public abstract class AsyncShardFetchCache<K extends BaseNodeResponse> {
     }
 
     private void handleNodeFailure(BaseNodeEntry nodeEntry, FailedNodeException failure, long fetchingRound) {
+        clusterManagerMetrics.incrementCounter(clusterManagerMetrics.asyncFetchTotalCounter, 1.0);
+        clusterManagerMetrics.incrementCounter(clusterManagerMetrics.asyncFetchFailureCounter, 1.0);
         if (nodeEntry.getFetchingRound() != fetchingRound) {
             assert nodeEntry.getFetchingRound() > fetchingRound : "node entries only replaced by newer rounds";
             logger.trace(
