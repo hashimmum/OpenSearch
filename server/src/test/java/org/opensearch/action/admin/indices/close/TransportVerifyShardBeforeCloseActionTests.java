@@ -208,7 +208,7 @@ public class TransportVerifyShardBeforeCloseActionTests extends OpenSearchTestCa
 
     public void testShardIsSynced() throws Throwable {
         executeOnPrimaryOrReplica(true);
-        verify(indexShard, times(1)).sync();
+        verify(indexShard, times(1)).sync(true);
     }
 
     public void testOperationFailsWhenNotBlocked() {

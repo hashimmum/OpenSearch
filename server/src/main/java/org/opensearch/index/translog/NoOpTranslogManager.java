@@ -73,6 +73,9 @@ public class NoOpTranslogManager implements TranslogManager {
     public void syncTranslog() throws IOException {}
 
     @Override
+    public void syncTranslog(boolean force) throws IOException {}
+
+    @Override
     public TranslogStats getTranslogStats() {
         return translogStats;
     }

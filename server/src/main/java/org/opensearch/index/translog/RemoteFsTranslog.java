@@ -463,7 +463,12 @@ public class RemoteFsTranslog extends Translog {
 
     @Override
     public void sync() throws IOException {
-        if (syncToDisk() || syncNeeded()) {
+        sync(false);
+    }
+
+    @Override
+    public void sync(boolean force) throws IOException {
+        if (syncToDisk() || syncNeeded() || force) {
             prepareAndUpload(primaryTermSupplier.getAsLong(), null);
         }
     }
