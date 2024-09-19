@@ -2441,6 +2441,7 @@ public abstract class BlobStoreRepository extends AbstractLifecycleComponent imp
                 // number_of_shards) has increased.
                 Set<String> updatedIndexIds = writeNewIndexShardPaths(existingRepositoryData, updatedRepositoryData, snapshotId);
                 cleanupRedundantSnapshotShardPaths(updatedIndexIds);
+                logger.info("update repo data for {}", snapshotInfo.snapshotId());
                 writeIndexGen(
                     updatedRepositoryData,
                     repositoryStateId,
@@ -3224,6 +3225,7 @@ public abstract class BlobStoreRepository extends AbstractLifecycleComponent imp
                         + "] must be larger than latest known generation ["
                         + latestKnownRepoGen.get()
                         + "]";
+                    logger.info("Setting it to {} {}", safeGeneration, newGen);
                     return ClusterState.builder(currentState)
                         .metadata(
                             Metadata.builder(currentState.getMetadata())
@@ -3344,6 +3346,7 @@ public abstract class BlobStoreRepository extends AbstractLifecycleComponent imp
                                     + "]"
                             );
                         }
+                        logger.info("Done Setting it to {} {}", newGen, newGen);
                         return updateRepositoryGenerationsIfNecessary(
                             stateFilter.apply(
                                 ClusterState.builder(currentState)

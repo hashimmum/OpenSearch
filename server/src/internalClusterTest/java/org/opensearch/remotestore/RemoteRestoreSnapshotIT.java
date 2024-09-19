@@ -997,6 +997,72 @@ public class RemoteRestoreSnapshotIT extends AbstractSnapshotIntegTestCase {
         assertThat(repositoryData.getSnapshotIds().size(), greaterThanOrEqualTo(1));
     }
 
+    public void testConcurrentSnapshotV2CreateOperation_MasterChange() throws InterruptedException, ExecutionException, IOException {
+        internalCluster().startClusterManagerOnlyNode(pinnedTimestampSettings());
+        internalCluster().startClusterManagerOnlyNode(pinnedTimestampSettings());
+        internalCluster().startClusterManagerOnlyNode(pinnedTimestampSettings());
+        internalCluster().startDataOnlyNode(pinnedTimestampSettings());
+        internalCluster().startDataOnlyNode(pinnedTimestampSettings());
+        String indexName1 = "testindex1";
+        String indexName2 = "testindex2";
+        String snapshotRepoName = "test-create-snapshot-repo";
+        Path absolutePath1 = randomRepoPath().toAbsolutePath();
+        logger.info("Snapshot Path [{}]", absolutePath1);
+
+        Settings.Builder settings = Settings.builder()
+            .put(FsRepository.LOCATION_SETTING.getKey(), absolutePath1)
+            .put(FsRepository.COMPRESS_SETTING.getKey(), randomBoolean())
+            .put(FsRepository.CHUNK_SIZE_SETTING.getKey(), randomIntBetween(100, 1000), ByteSizeUnit.BYTES)
+            .put(BlobStoreRepository.REMOTE_STORE_INDEX_SHALLOW_COPY.getKey(), true)
+            .put(BlobStoreRepository.SHALLOW_SNAPSHOT_V2.getKey(), true);
+        createRepository(snapshotRepoName, FsRepository.TYPE, settings);
+
+        Client client = client();
+        Settings indexSettings = getIndexSettings(20, 0).build();
+        createIndex(indexName1, indexSettings);
+
+        Settings indexSettings2 = getIndexSettings(15, 0).build();
+        createIndex(indexName2, indexSettings2);
+
+        final int numDocsInIndex1 = 10;
+        final int numDocsInIndex2 = 20;
+        indexDocuments(client, indexName1, numDocsInIndex1);
+        indexDocuments(client, indexName2, numDocsInIndex2);
+        ensureGreen(indexName1, indexName2);
+
+        Thread thread = new Thread(() -> {
+            try {
+                String snapshotName = "snapshot-earlier-master";
+                CreateSnapshotResponse createSnapshotResponse2 = client().admin()
+                    .cluster()
+                    .prepareCreateSnapshot(snapshotRepoName, snapshotName)
+                    .setWaitForCompletion(true)
+                    .get();
+            } catch (Exception e) {}
+        });
+
+        thread.start();
+
+        // stop existing master
+        final String clusterManagerNode = internalCluster().getClusterManagerName();
+        stopNode(clusterManagerNode);
+
+        // Validate that we have greater one snapshot has been created
+        String snapshotName = "new-snapshot";
+        CreateSnapshotResponse createSnapshotResponse2 = client().admin()
+            .cluster()
+            .prepareCreateSnapshot(snapshotRepoName, snapshotName)
+            .setWaitForCompletion(false)
+            .get();
+        Repository repository = internalCluster().getInstance(RepositoriesService.class).repository(snapshotRepoName);
+        PlainActionFuture<RepositoryData> repositoryDataPlainActionFuture = new PlainActionFuture<>();
+        repository.getRepositoryData(repositoryDataPlainActionFuture);
+
+        RepositoryData repositoryData = repositoryDataPlainActionFuture.get();
+        assertThat(repositoryData.getSnapshotIds().size(), greaterThanOrEqualTo(1));
+        thread.join();
+    }
+    
     public void testCreateSnapshotV2WithRedIndex() throws Exception {
         internalCluster().startClusterManagerOnlyNode(pinnedTimestampSettings());
         internalCluster().startDataOnlyNode(pinnedTimestampSettings());
