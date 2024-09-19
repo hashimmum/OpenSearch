@@ -9,6 +9,7 @@
 package org.opensearch.common.xcontent;
 
 import org.opensearch.common.xcontent.json.JsonXContent;
+import org.opensearch.core.common.ParsingException;
 import org.opensearch.core.common.Strings;
 import org.opensearch.core.common.bytes.BytesReference;
 import org.opensearch.core.xcontent.AbstractXContentParser;
@@ -88,9 +89,6 @@ public class JsonToStringXContentParser extends AbstractXContentParser {
      * @return true if the child object contains no_null value, false otherwise
      */
     private boolean parseToken(Deque<String> path, String currentFieldName) throws IOException {
-        if (path.size() == 1 && processNoNestedValue()) {
-            return true;
-        }
         boolean isChildrenValueValid = false;
         boolean visitFieldName = false;
         if (this.parser.currentToken() == Token.FIELD_NAME) {
@@ -117,8 +115,6 @@ public class JsonToStringXContentParser extends AbstractXContentParser {
                 isChildrenValueValid |= parseToken(path, currentFieldName);
             }
             this.parser.nextToken();
-        } else if (this.parser.currentToken() == Token.END_ARRAY) {
-            // skip
         } else if (this.parser.currentToken() == Token.START_OBJECT) {
             parser.nextToken();
             while (this.parser.currentToken() != Token.END_OBJECT) {
@@ -148,21 +144,6 @@ public class JsonToStringXContentParser extends AbstractXContentParser {
         this.keyList.remove(keyList.size() - 1);
     }
 
-    private boolean processNoNestedValue() throws IOException {
-        if (parser.currentToken() == Token.VALUE_NULL) {
-            return true;
-        } else if (this.parser.currentToken() == Token.VALUE_STRING
-            || this.parser.currentToken() == Token.VALUE_NUMBER
-            || this.parser.currentToken() == Token.VALUE_BOOLEAN) {
-                String value = this.parser.textOrNull();
-                if (value != null) {
-                    this.valueList.add(value);
-                }
-                return true;
-            }
-        return false;
-    }
-
     private String parseValue() throws IOException {
         switch (this.parser.currentToken()) {
             case VALUE_BOOLEAN:
@@ -172,7 +153,7 @@ public class JsonToStringXContentParser extends AbstractXContentParser {
                 return this.parser.textOrNull();
             // Handle other token types as needed
             default:
-                throw new IOException("Unsupported value token type [" + parser.currentToken() + "]");
+                throw new ParsingException(parser.getTokenLocation(), "Unexpected value token type [" + parser.currentToken() + "]");
         }
     }
 
