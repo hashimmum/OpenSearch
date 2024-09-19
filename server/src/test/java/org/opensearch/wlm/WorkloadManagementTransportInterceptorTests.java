@@ -8,6 +8,7 @@
 
 package org.opensearch.wlm;
 
+import org.opensearch.common.SetOnce;
 import org.opensearch.test.OpenSearchTestCase;
 import org.opensearch.threadpool.TestThreadPool;
 import org.opensearch.threadpool.ThreadPool;
@@ -16,6 +17,7 @@ import org.opensearch.transport.TransportRequestHandler;
 import org.opensearch.wlm.WorkloadManagementTransportInterceptor.RequestHandler;
 
 import static org.opensearch.threadpool.ThreadPool.Names.SAME;
+import static org.mockito.Mockito.mock;
 
 public class WorkloadManagementTransportInterceptorTests extends OpenSearchTestCase {
 
@@ -25,7 +27,7 @@ public class WorkloadManagementTransportInterceptorTests extends OpenSearchTestC
     public void setUp() throws Exception {
         super.setUp();
         threadPool = new TestThreadPool(getTestName());
-        sut = new WorkloadManagementTransportInterceptor(threadPool, new QueryGroupService());
+        sut = new WorkloadManagementTransportInterceptor(threadPool, new SetOnce<>(mock(QueryGroupService.class)));
     }
 
     public void tearDown() throws Exception {
