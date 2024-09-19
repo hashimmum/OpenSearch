@@ -27,6 +27,8 @@ import org.opensearch.common.util.io.IOUtils;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.compress.Compressor;
 import org.opensearch.gateway.remote.ClusterMetadataManifest;
+import org.opensearch.gateway.remote.DefaultRandomObject;
+import org.opensearch.gateway.remote.RemoteClusterStateSettings;
 import org.opensearch.gateway.remote.RemoteClusterStateUtils;
 import org.opensearch.gateway.remote.RemoteStateTransferException;
 import org.opensearch.gateway.remote.model.RemoteRoutingTableBlobStore;
@@ -45,10 +47,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Random;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
+import static org.opensearch.gateway.remote.RemoteClusterStateUtils.toPositiveLongAtMost;
 import static org.opensearch.node.remotestore.RemoteStoreNodeAttribute.isRemoteRoutingTableEnabled;
 
 /**
@@ -68,11 +72,14 @@ public class InternalRemoteRoutingTableService extends AbstractLifecycleComponen
     private BlobStoreRepository blobStoreRepository;
     private final ThreadPool threadPool;
     private final String clusterName;
+    private RemoteClusterStateSettings remoteClusterStateSettings;
+    private Random random;
 
     public InternalRemoteRoutingTableService(
         Supplier<RepositoriesService> repositoriesService,
         Settings settings,
         ClusterSettings clusterSettings,
+        RemoteClusterStateSettings remoteClusterStateSettings,
         ThreadPool threadpool,
         String clusterName
     ) {
@@ -82,6 +89,8 @@ public class InternalRemoteRoutingTableService extends AbstractLifecycleComponen
         this.threadPool = threadpool;
         this.clusterName = clusterName;
         this.clusterSettings = clusterSettings;
+        this.remoteClusterStateSettings = remoteClusterStateSettings;
+        this.random = DefaultRandomObject.INSTANCE;
     }
 
     public List<IndexRoutingTable> getIndicesRouting(RoutingTable routingTable) {
@@ -193,7 +202,10 @@ public class InternalRemoteRoutingTableService extends AbstractLifecycleComponen
 
         RemoteIndexRoutingTable remoteIndexRoutingTable = new RemoteIndexRoutingTable(uploadedFilename, clusterUUID, compressor);
 
-        remoteIndexRoutingTableStore.readAsync(remoteIndexRoutingTable, actionListener);
+        long maxDelayInMillis = remoteClusterStateSettings.getRemoteStateReadMaxJitter().getMillis();
+        final long delayInMillis = toPositiveLongAtMost(random.nextLong(), maxDelayInMillis);
+        remoteIndexRoutingTableStore.readAsyncWithDelay(delayInMillis, remoteIndexRoutingTable, actionListener);
+
     }
 
     @Override
@@ -208,7 +220,10 @@ public class InternalRemoteRoutingTableService extends AbstractLifecycleComponen
         );
 
         RemoteRoutingTableDiff remoteRoutingTableDiff = new RemoteRoutingTableDiff(uploadedFilename, clusterUUID, compressor);
-        remoteRoutingTableDiffStore.readAsync(remoteRoutingTableDiff, actionListener);
+
+        long maxDelayInMillis = remoteClusterStateSettings.getRemoteStateReadMaxJitter().getMillis();
+        final long delayInMillis = toPositiveLongAtMost(random.nextLong(), maxDelayInMillis);
+        remoteRoutingTableDiffStore.readAsyncWithDelay(delayInMillis, remoteRoutingTableDiff, actionListener);
     }
 
     @Override

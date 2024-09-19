@@ -8,12 +8,19 @@
 
 package org.opensearch.common.remote;
 
+import org.opensearch.common.settings.ClusterSettings;
+import org.opensearch.common.settings.Settings;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.gateway.remote.ClusterMetadataManifest;
+import org.opensearch.gateway.remote.DefaultRandomObject;
+import org.opensearch.gateway.remote.RemoteClusterStateSettings;
 import org.opensearch.gateway.remote.model.RemoteReadResult;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Random;
+
+import static org.opensearch.gateway.remote.RemoteClusterStateUtils.toPositiveLongAtMost;
 
 /**
  * An abstract class that provides a base implementation for managing remote entities in the remote store.
@@ -23,6 +30,13 @@ public abstract class AbstractRemoteWritableEntityManager implements RemoteWrita
      * A map that stores the remote writable entity stores, keyed by the entity type.
      */
     protected final Map<String, RemoteWritableEntityStore> remoteWritableEntityStores = new HashMap<>();
+
+    protected RemoteClusterStateSettings remoteClusterStateSettings = new RemoteClusterStateSettings(
+        Settings.EMPTY,
+        new ClusterSettings(Settings.EMPTY, ClusterSettings.BUILT_IN_CLUSTER_SETTINGS)
+    );
+
+    protected final Random random = DefaultRandomObject.INSTANCE;
 
     /**
      * Retrieves the remote writable entity store for the given entity.
@@ -79,6 +93,9 @@ public abstract class AbstractRemoteWritableEntityManager implements RemoteWrita
 
     @Override
     public void readAsync(String component, AbstractClusterMetadataWriteableBlobEntity entity, ActionListener<RemoteReadResult> listener) {
-        getStore(entity).readAsync(entity, getWrappedReadListener(component, entity, listener));
+        long maxDelayInMillis = remoteClusterStateSettings.getRemoteStateReadMaxJitter().getMillis();
+        final long delayInMillis = toPositiveLongAtMost(random.nextLong(), maxDelayInMillis);
+        getStore(entity).readAsyncWithDelay(delayInMillis, entity, getWrappedReadListener(component, entity, listener));
     }
+
 }
