@@ -518,7 +518,7 @@ public class DiscoveryNode implements VerifiableWriteable, ToXContentFragment {
      * Returns whether remote cluster state publication is enabled on this node
      * @return true if the node contains remote cluster state node attribute and remote routing table node attribute
      */
-    public boolean isRemoteStatePublicationEnabled() {
+    public boolean isRemoteStatePublicationConfigured() {
         return this.getAttributes()
             .keySet()
             .stream()

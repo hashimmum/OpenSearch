@@ -186,7 +186,9 @@ public class Coordinator extends AbstractLifecycleComponent implements Discovery
     private Optional<CoordinatorPublication> currentPublication = Optional.empty();
     private final NodeHealthService nodeHealthService;
     private final PersistedStateRegistry persistedStateRegistry;
+    private final RemoteClusterStateService remoteClusterStateService;
     private final RemoteStoreNodeService remoteStoreNodeService;
+    private final ClusterSettings clusterSettings;
 
     /**
      * @param nodeName The name of the node, used to name the {@link java.util.concurrent.ExecutorService} of the {@link SeedHostsResolver}.
@@ -310,6 +312,8 @@ public class Coordinator extends AbstractLifecycleComponent implements Discovery
         this.persistedStateRegistry = persistedStateRegistry;
         this.localNodeCommissioned = true;
         this.remoteStoreNodeService = remoteStoreNodeService;
+        this.remoteClusterStateService = remoteClusterStateService;
+        this.clusterSettings = clusterSettings;
     }
 
     private ClusterFormationState getClusterFormationState() {
@@ -858,7 +862,9 @@ public class Coordinator extends AbstractLifecycleComponent implements Discovery
     @Override
     protected void doStart() {
         synchronized (mutex) {
-            coordinationState.set(new CoordinationState(getLocalNode(), persistedStateRegistry, electionStrategy, settings));
+            coordinationState.set(
+                new CoordinationState(getLocalNode(), persistedStateRegistry, electionStrategy, settings, clusterSettings)
+            );
             peerFinder.setCurrentTerm(getCurrentTerm());
             configuredHostsResolver.start();
             final ClusterState lastAcceptedState = coordinationState.get().getLastAcceptedState();
@@ -903,9 +909,9 @@ public class Coordinator extends AbstractLifecycleComponent implements Discovery
                 stats.add(persistedStateRegistry.getPersistedState(stateType).getStats());
             }
         });
-        if (coordinationState.get().isRemotePublicationEnabled()) {
-            stats.add(publicationHandler.getFullDownloadStats());
-            stats.add(publicationHandler.getDiffDownloadStats());
+        if (remoteClusterStateService != null) {
+            stats.add(remoteClusterStateService.getFullDownloadStats());
+            stats.add(remoteClusterStateService.getDiffDownloadStats());
         }
         clusterStateStats.setPersistenceStats(stats);
         return new DiscoveryStats(new PendingClusterStateStats(0, 0, 0), publicationHandler.stats(), clusterStateStats);
