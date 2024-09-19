@@ -160,7 +160,7 @@ public class TransportVerifyShardBeforeCloseAction extends TransportReplicationA
             // to the primary (we call this phase1), and phase2 can then use the fact that the global checkpoint has moved to the maximum
             // sequence number to pass the verifyShardBeforeIndexClosing check and create a safe commit where the maximum sequence number
             // is equal to the global checkpoint.
-            indexShard.sync();
+            indexShard.sync(true);
         } else {
             indexShard.verifyShardBeforeIndexClosing();
             indexShard.flush(new FlushRequest().force(true).waitIfOngoing(true));

@@ -751,6 +751,13 @@ public abstract class Translog extends AbstractIndexShardComponent implements In
      * Sync's the translog.
      */
     public void sync() throws IOException {
+        sync(false);
+    }
+
+    /**
+     * Sync's the translog.
+     */
+    public void sync(boolean ignored) throws IOException {
         try (ReleasableLock lock = readLock.acquire()) {
             if (closed.get() == false) {
                 current.sync();

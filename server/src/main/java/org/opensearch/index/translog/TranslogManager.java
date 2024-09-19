@@ -59,6 +59,12 @@ public interface TranslogManager {
     void syncTranslog() throws IOException;
 
     /**
+     * Syncs translog with option to force sync
+     * @throws IOException the exception while performing the sync operation
+     */
+    void syncTranslog(boolean force) throws IOException;
+
+    /**
      * Translog operation stats
      * @return the translog stats
      */

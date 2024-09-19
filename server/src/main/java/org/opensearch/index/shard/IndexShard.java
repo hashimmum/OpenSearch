@@ -4507,8 +4507,12 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
     }
 
     public void sync() throws IOException {
+        sync(false);
+    }
+
+    public void sync(boolean force) throws IOException {
         verifyNotClosed();
-        getEngine().translogManager().syncTranslog();
+        getEngine().translogManager().syncTranslog(force);
     }
 
     /**

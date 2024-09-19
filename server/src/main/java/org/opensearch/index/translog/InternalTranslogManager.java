@@ -195,7 +195,12 @@ public class InternalTranslogManager implements TranslogManager, Closeable {
      */
     @Override
     public void syncTranslog() throws IOException {
-        translog.sync();
+        syncTranslog(false);
+    }
+
+    @Override
+    public void syncTranslog(boolean force) throws IOException {
+        translog.sync(force);
         translogEventListener.onAfterTranslogSync();
     }
 
